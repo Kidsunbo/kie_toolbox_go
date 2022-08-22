@@ -63,7 +63,7 @@ jobs:
     # - run: |
     #   echo "Run, Build Application using script"
     #   ./location_of_script_within_repo/buildscript.sh
-    - run: go build ${{ matrix.sub_module }}
+    - run: go build $GITHUB_WORKSPACE/${{ matrix.sub_module }}
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
