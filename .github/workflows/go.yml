@@ -1,4 +1,4 @@
-name: Container
+name: Go
 
 on:
   push:
@@ -29,3 +29,6 @@ jobs:
     - name: Test
       working-directory: ${{github.workspace}}/${{matrix.sub_module}}
       run: go test -v ./...
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
