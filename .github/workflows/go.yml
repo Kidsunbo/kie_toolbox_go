@@ -28,7 +28,7 @@ jobs:
 
     - name: Test
       working-directory: ${{github.workspace}}/${{matrix.sub_module}}
-      run: go test -v ./...
+      run: go test -v ./... -race -coverprofile=coverage.out -covermode=atomic
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
