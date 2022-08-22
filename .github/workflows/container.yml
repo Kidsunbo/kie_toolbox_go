@@ -1,4 +1,4 @@
-name: Go
+name: Container
 
 on:
   push:
@@ -6,10 +6,14 @@ on:
   pull_request:
     branches: [ "master" ]
 
-jobs:
 
+
+jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix: 
+        sub_module: [container]
     steps:
     - uses: actions/checkout@v3
 
@@ -19,7 +23,9 @@ jobs:
         go-version: 1.18
 
     - name: Build
-      run: go build -v ./...
+      working-directory: ${{github.workspace}}/${{matrix.sub_module}}
+      run: go build -v .
 
     - name: Test
+      working-directory: ${{github.workspace}}/${{matrix.sub_module}}
       run: go test -v ./...
