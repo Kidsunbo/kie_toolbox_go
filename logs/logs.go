@@ -30,6 +30,7 @@ type Logger struct {
 	ctxFunc     func(ctx context.Context) string
 	pathLength  int8
 	callerDepth int
+	msgPrefix   string
 }
 
 func (l *Logger) SetLevel(level Level) {
@@ -62,6 +63,10 @@ func (l *Logger) SetCallerDepth(depth int) {
 
 func (l *Logger) SetPathLength(length int8) {
 	l.pathLength = length
+}
+
+func (l *Logger) SetMessagePrefix(prefix string) {
+	l.msgPrefix = prefix
 }
 
 func (l *Logger) getLogMetaInfo() string {
@@ -120,7 +125,7 @@ func (l *Logger) Debug(format string, values ...interface{}) {
 	if l.level > LevelDebug {
 		return
 	}
-	l.debugLogger.Println(l.getLogMetaInfo(), fmt.Sprintf(format, values...))
+	l.debugLogger.Println(l.getLogMetaInfo(), fmt.Sprintf(l.msgPrefix+format, values...))
 }
 
 func (l *Logger) CtxDebug(ctx context.Context, format string, values ...interface{}) {
@@ -131,14 +136,14 @@ func (l *Logger) CtxDebug(ctx context.Context, format string, values ...interfac
 	if l.ctxFunc != nil {
 		ctxStr = l.ctxFunc(ctx)
 	}
-	l.debugLogger.Println(l.getLogMetaInfo(), ctxStr, fmt.Sprintf(format, values...))
+	l.debugLogger.Println(l.getLogMetaInfo(), ctxStr, fmt.Sprintf(l.msgPrefix+format, values...))
 }
 
 func (l *Logger) Info(format string, values ...interface{}) {
 	if l.level > LevelInfo {
 		return
 	}
-	l.infoLogger.Println(l.getLogMetaInfo(), fmt.Sprintf(format, values...))
+	l.infoLogger.Println(l.getLogMetaInfo(), fmt.Sprintf(l.msgPrefix+format, values...))
 }
 
 func (l *Logger) CtxInfo(ctx context.Context, format string, values ...interface{}) {
@@ -149,14 +154,14 @@ func (l *Logger) CtxInfo(ctx context.Context, format string, values ...interface
 	if l.ctxFunc != nil {
 		ctxStr = l.ctxFunc(ctx)
 	}
-	l.infoLogger.Println(l.getLogMetaInfo(), ctxStr, fmt.Sprintf(format, values...))
+	l.infoLogger.Println(l.getLogMetaInfo(), ctxStr, fmt.Sprintf(l.msgPrefix+format, values...))
 }
 
 func (l *Logger) Warn(format string, values ...interface{}) {
 	if l.level > LevelWarn {
 		return
 	}
-	l.warnLogger.Println(l.getLogMetaInfo(), fmt.Sprintf(format, values...))
+	l.warnLogger.Println(l.getLogMetaInfo(), fmt.Sprintf(l.msgPrefix+format, values...))
 }
 
 func (l *Logger) CtxWarn(ctx context.Context, format string, values ...interface{}) {
@@ -167,14 +172,14 @@ func (l *Logger) CtxWarn(ctx context.Context, format string, values ...interface
 	if l.ctxFunc != nil {
 		ctxStr = l.ctxFunc(ctx)
 	}
-	l.warnLogger.Println(l.getLogMetaInfo(), ctxStr, fmt.Sprintf(format, values...))
+	l.warnLogger.Println(l.getLogMetaInfo(), ctxStr, fmt.Sprintf(l.msgPrefix+format, values...))
 }
 
 func (l *Logger) Error(format string, values ...interface{}) {
 	if l.level > LevelError {
 		return
 	}
-	l.errorLogger.Println(l.getLogMetaInfo(), fmt.Sprintf(format, values...))
+	l.errorLogger.Println(l.getLogMetaInfo(), fmt.Sprintf(l.msgPrefix+format, values...))
 }
 
 func (l *Logger) CtxError(ctx context.Context, format string, values ...interface{}) {
@@ -185,14 +190,14 @@ func (l *Logger) CtxError(ctx context.Context, format string, values ...interfac
 	if l.ctxFunc != nil {
 		ctxStr = l.ctxFunc(ctx)
 	}
-	l.errorLogger.Println(l.getLogMetaInfo(), ctxStr, fmt.Sprintf(format, values...))
+	l.errorLogger.Println(l.getLogMetaInfo(), ctxStr, fmt.Sprintf(l.msgPrefix+format, values...))
 }
 
 func (l *Logger) Fatal(format string, values ...interface{}) {
 	if l.level > LevelFatal {
 		return
 	}
-	l.fatalLogger.Println(l.getLogMetaInfo(), fmt.Sprintf(format, values...))
+	l.fatalLogger.Println(l.getLogMetaInfo(), fmt.Sprintf(l.msgPrefix+format, values...))
 	panic("panic happened because fatal is reported")
 }
 
@@ -204,7 +209,7 @@ func (l *Logger) CtxFatal(ctx context.Context, format string, values ...interfac
 	if l.ctxFunc != nil {
 		ctxStr = l.ctxFunc(ctx)
 	}
-	l.fatalLogger.Println(l.getLogMetaInfo(), ctxStr, fmt.Sprintf(format, values...))
+	l.fatalLogger.Println(l.getLogMetaInfo(), ctxStr, fmt.Sprintf(l.msgPrefix+format, values...))
 	panic("panic happened because fatal is reported")
 }
 
@@ -219,14 +224,20 @@ func defaultContextFunction(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}
-	if ctx.Value("LOG_ID") == nil {
-		return ""
+	result := make([]string, 0, 2)
+	if ctx.Value("X-Request-ID") != nil {
+		requestID, ok := ctx.Value("X-Request-ID").(string)
+		if ok {
+			result = append(result, requestID)
+		}
 	}
-	result, ok := ctx.Value("LOG_ID").(string)
-	if ok {
-		return result
+	if ctx.Value("X-Real-IP") != nil {
+		ip, ok := ctx.Value("X-Real-IP").(string)
+		if ok {
+			result = append(result, ip)
+		}
 	}
-	return ""
+	return strings.Join(result, " ")
 }
 
 func New() *Logger {
@@ -240,6 +251,7 @@ func New() *Logger {
 		ctxFunc:     defaultContextFunction,
 		pathLength:  1,
 		callerDepth: 2,
+		msgPrefix:   "msg=",
 	}
 }
 
