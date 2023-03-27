@@ -1,6 +1,7 @@
 package cast
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -169,6 +170,12 @@ func To[T SupportedType](s string) (T, error) {
 	default:
 		return result, errors.New("no supported type")
 	}
+}
+
+func JSONTo[T any](s string) (*T, error) {
+	var result = new(T)
+	err := json.Unmarshal([]byte(s), &result)
+	return result, err
 }
 
 func ToWithDefault[T SupportedType](s string, defaultValue T) T {

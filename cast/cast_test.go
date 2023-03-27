@@ -374,3 +374,24 @@ func TestToUnderlyingType(t *testing.T) {
 	assert.Equal(t, UnderlyingFloat64(123.456), vf64)
 	assert.Equal(t, nil, err)
 }
+
+func TestJSONTo(t *testing.T) {
+	type s struct {
+		Hello string `json:"hello"`
+		World int64  `json:"world"`
+	}
+	v, err := JSONTo[s](`{"world": 1234567, "hello":"hey"}`)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, "hey", v.Hello)
+	assert.Equal(t, int64(1234567), v.World)
+
+	v, err = JSONTo[s](`{"cat":"wolf", "dog":"meow"}`)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, "", v.Hello)
+	assert.Equal(t, int64(0), v.World)
+
+	v, err = JSONTo[s](`{"cat":"wolf", "dog":"meow"`)
+	assert.NotEqual(t, nil, err)
+	assert.Equal(t, "", v.Hello)
+	assert.Equal(t, int64(0), v.World)
+}
