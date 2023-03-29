@@ -146,3 +146,12 @@ func (v *Vector[T]) ForEach(f func(i int, v T) bool) {
 		}
 	}
 }
+
+func (v *Vector[T]) Any(f func(value T)bool)bool{
+	for _, item := range v.Range(){
+		if f(item){
+			return true
+		}
+	}	
+	return false
+}

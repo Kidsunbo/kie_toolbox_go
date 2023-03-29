@@ -124,10 +124,13 @@ func TestVectorRead(t *testing.T) {
 	assert.NotEqual(t, (*reflect.SliceHeader)(unsafe.Pointer(&data)).Data, (*reflect.SliceHeader)(unsafe.Pointer(&d)).Data)
 	assert.False(t, v.Empty())
 	assert.Equal(t, v.String(), "[0 1 2 3 4 5 6 7 8 9]")
+	assert.True(t, v.Any(func(value int) bool {return value == 7}))
+
 
 	vv := NewVector[string]()
 	assert.True(t, vv.Empty())
 	assert.Equal(t, vv.String(), "[]")
+	assert.False(t, v.Any(func(value int) bool {return value == 10}))
 }
 
 func TestVectorWrite(t *testing.T) {
