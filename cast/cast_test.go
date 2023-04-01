@@ -1,8 +1,9 @@
 package cast
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestToBool(t *testing.T) {
@@ -380,18 +381,23 @@ func TestJSONTo(t *testing.T) {
 		Hello string `json:"hello"`
 		World int64  `json:"world"`
 	}
-	v, err := JSONTo[s](`{"world": 1234567, "hello":"hey"}`)
+	v, err := JSONTo[*s](`{"world": 1234567, "hello":"hey"}`)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, "hey", v.Hello)
 	assert.Equal(t, int64(1234567), v.World)
 
-	v, err = JSONTo[s](`{"cat":"wolf", "dog":"meow"}`)
+	v, err = JSONTo[*s](`{"cat":"wolf", "dog":"meow"}`)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, "", v.Hello)
 	assert.Equal(t, int64(0), v.World)
 
-	v, err = JSONTo[s](`{"cat":"wolf", "dog":"meow"`)
+	v, err = JSONTo[*s](`{"cat":"wolf", "dog":"meow"`)
 	assert.NotEqual(t, nil, err)
-	assert.Equal(t, "", v.Hello)
-	assert.Equal(t, int64(0), v.World)
+	assert.True(t, v == nil)
+
+	a, err := JSONTo[[]string](`["hello", "world"]`)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, 2, len(a))
+	assert.Equal(t, "hello", a[0])
+	assert.Equal(t, "world", a[1])
 }
