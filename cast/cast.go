@@ -172,8 +172,8 @@ func To[T SupportedType](s string) (T, error) {
 	}
 }
 
-func JSONTo[T any](s string) (*T, error) {
-	var result = new(T)
+func JSONTo[T any](s string) (T, error) {
+	var result T
 	err := json.Unmarshal([]byte(s), &result)
 	return result, err
 }
