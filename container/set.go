@@ -53,6 +53,14 @@ func (s *Set[T]) Range() map[T]struct{} {
 	return s.data
 }
 
+func (s *Set[T]) ToSlice() []T{
+	var result []T
+	for k := range s.data{
+		result = append(result, k)
+	}
+	return result
+}
+
 type SyncSet[T comparable] struct {
 	m sync.Map
 }
