@@ -40,7 +40,7 @@ func TestLogsWithContext(t *testing.T) {
 
 func TestLogsWithContextLogID(t *testing.T) {
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, "X-Request-ID", "1234567890")
+	ctx = context.WithValue(ctx, RequestID{}, "1234567890")
 	defer func() {
 		if a := recover(); a != nil {
 			fmt.Println("[PASS]")
@@ -57,7 +57,7 @@ func TestLogsWithContextLogID(t *testing.T) {
 
 func TestLogsSetOutputFile(t *testing.T) {
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, "X-Request-ID", "1234567890")
+	ctx = context.WithValue(ctx, RequestID{}, "1234567890")
 	defer func() {
 		err := os.Remove("hello.log")
 		if err != nil {
@@ -85,7 +85,7 @@ func TestLogsSetOutputFile(t *testing.T) {
 
 func TestLogsSetLevel(t *testing.T) {
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, "X-Request-ID", "1234567890")
+	ctx = context.WithValue(ctx, RequestID{}, "1234567890")
 	defer func() {
 		if a := recover(); a != nil {
 			fmt.Println("[PASS]")
