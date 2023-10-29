@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+type RequestID struct{}
+
 type Level int8
 
 const (
@@ -225,8 +227,8 @@ func defaultContextFunction(ctx context.Context) string {
 		return ""
 	}
 	result := make([]string, 0, 2)
-	if ctx.Value("X-Request-ID") != nil {
-		requestID, ok := ctx.Value("X-Request-ID").(string)
+	if ctx.Value(RequestID{}) != nil {
+		requestID, ok := ctx.Value(RequestID{}).(string)
 		if ok {
 			result = append(result, requestID)
 		}
