@@ -154,3 +154,20 @@ func TestRemoveEdge(t *testing.T) {
 	assert.EqualError(t, dag.RemoveEdge(10, 3), "failed to remove edge, the from vertex 10 doesn't exist")
 	assert.EqualError(t, dag.RemoveEdge(3, 10), "failed to remove edge, the to vertex 10 doesn't exist")
 }
+
+func TestCheckCycle(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	assert.NoError(t, dag.AddVertex(1, 1))
+	assert.NoError(t, dag.AddVertex(2, 2))
+	assert.NoError(t, dag.AddVertex(3, 3))
+	assert.NoError(t, dag.AddVertex(4, 4))
+	assert.NoError(t, dag.AddEdge(3, 4))
+	assert.NoError(t, dag.AddEdge(1, 2))
+	assert.NoError(t, dag.AddEdge(3, 2))
+
+	pass, cycles := dag.CheckCycle()
+	assert.True(t, pass)
+	assert.Nil(t, cycles)
+	assert.True(t, dag.IsChecked())
+
+}
