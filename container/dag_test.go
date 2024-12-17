@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestDag(t *testing.T) {
+func TestAddVertex(t *testing.T) {
 	dag := NewDag[int, int]("debug")
 	if err := dag.AddVertex(1, 1); err != nil {
 		panic(err)
