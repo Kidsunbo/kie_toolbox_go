@@ -109,12 +109,12 @@ func (d *Dag[K, T]) RemoveEdge(from, to K) error {
 
 	fromVertex, exist := d.vertices[from]
 	if !exist {
-		return fmt.Errorf("failed to add edge, the from vertex %v doesn't exist", from)
+		return fmt.Errorf("failed to remove edge, the from vertex %v doesn't exist", from)
 	}
 
 	toVertex, exist := d.vertices[to]
 	if !exist {
-		return fmt.Errorf("failed to add edge, the to vertex %v doesn't exist", to)
+		return fmt.Errorf("failed to remove edge, the to vertex %v doesn't exist", to)
 	}
 
 	delete(fromVertex.outgoing, to)
