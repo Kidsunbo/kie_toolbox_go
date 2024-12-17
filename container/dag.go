@@ -135,6 +135,7 @@ func (d *Dag[K, T]) CheckCycle() (bool, [][]K) {
 		return true, nil
 	}
 
+	d.checked = true
 	cp := d.Copy()
 	topo := make([][]*vertex[K, T], 0)
 	for len(cp.vertices) != 0 {
@@ -145,7 +146,7 @@ func (d *Dag[K, T]) CheckCycle() (bool, [][]K) {
 			}
 		}
 		if len(batch) == 0 {
-			return false, nil
+			return false, nil // TODO, add the cycles
 		}
 		for _, vertex := range batch {
 			cp.RemoveVertex(vertex.name)
