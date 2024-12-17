@@ -1,7 +1,8 @@
 go 1.18
 
 use (
-	./container
-	./logs
 	./cast
+	./container
+	./kflow
+	./logs
 )
