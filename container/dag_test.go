@@ -163,11 +163,17 @@ func TestCheckCycle(t *testing.T) {
 	assert.NoError(t, dag.AddVertex(4, 4))
 	assert.NoError(t, dag.AddEdge(3, 4))
 	assert.NoError(t, dag.AddEdge(1, 2))
-	assert.NoError(t, dag.AddEdge(3, 2))
+	assert.NoError(t, dag.AddEdge(2, 4))
 
 	pass, cycles := dag.CheckCycle()
 	assert.True(t, pass)
 	assert.Nil(t, cycles)
 	assert.True(t, dag.IsChecked())
 
+	assert.NoError(t, dag.AddEdge(4, 1))
+	assert.False(t, dag.IsChecked())
+	pass, cycles = dag.CheckCycle()
+	assert.False(t, pass)
+	assert.Nil(t, cycles)
+	assert.False(t, dag.IsChecked())
 }

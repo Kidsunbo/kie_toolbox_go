@@ -135,7 +135,6 @@ func (d *Dag[K, T]) CheckCycle() (bool, [][]K) {
 		return true, nil
 	}
 
-	d.checked = true
 	cp := d.Copy()
 	topo := make([][]*vertex[K, T], 0)
 	for len(cp.vertices) != 0 {
@@ -157,6 +156,7 @@ func (d *Dag[K, T]) CheckCycle() (bool, [][]K) {
 		}
 	}
 	d.cachedTopo = topo
+	d.checked = true
 
 	return true, nil
 }
