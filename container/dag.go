@@ -1,14 +1,41 @@
+/*
+This library assumes that A is the root and the other vertices are the dependencies. By default, the E and F will be in the batch 3 and C will be in the batch 2.
+Sometimes, if you would like the vertex be executed eagerly, you could specify the align right.
+
+                   +---------+
+                   |         |
+             +---->|    B    +---+
+             |     |         |   |
+             |     +---------+   |
+             |                   |    +--------+
+             |                   |    |        |
+             |                   +--->|   E    |
++--------+   |     +---------+        |        |
+|        |   |     |         |        +--------+
+|   A    +---+---->|    C    |
+|        |   |     |         |
++--------+   |     +---------+
+             |                        +--------+
+             |                        |        |
+             |                   +--->|   F    |
+             |     +---------+   |    |        |
+             |     |         |   |    +--------+
+             +---->|    D    +---+
+                   |         |
+                   +---------+
+*/
+
 package container
 
 import (
 	"errors"
 	"fmt"
+	"sync"
 )
 
 type vertex[K comparable, T any] struct {
 	name     K
 	value    T
-	batch    int
 	outgoing map[K]*vertex[K, T]
 	incoming map[K]*vertex[K, T]
 }
@@ -27,10 +54,11 @@ func (v *vertex[K, T]) String() string {
 }
 
 type Dag[K comparable, T any] struct {
-	name       string
-	vertices   map[K]*vertex[K, T]
-	checked    bool
-	cachedTopo [][]*vertex[K, T]
+	name             string
+	vertices         map[K]*vertex[K, T]
+	checked          bool
+	cachedFullTopo   [][]T
+	cachedVertexTopo sync.Map // key: vertex name, value: map[K]struct{} (key: the dependency, value: the dependent key)
 }
 
 // NewDag create a directed acycle graph with each vertex whose key is of type K and the value is of type T.
@@ -53,7 +81,7 @@ func (d *Dag[K, T]) AddVertex(name K, value T) error {
 	return nil
 }
 
-// RemoveVertex removes the vertex from the dag. There is no chance to create cycle in the graph, so the check state of dag will keep.
+// RemoveVertex removes the vertex from the dag. There is no chance to create cycle in the graph, but the topological batch might change.
 func (d *Dag[K, T]) RemoveVertex(name K) error {
 	cur, exist := d.vertices[name]
 	if !exist {
@@ -68,6 +96,7 @@ func (d *Dag[K, T]) RemoveVertex(name K) error {
 		d.RemoveEdge(cur.name, vertex.name)
 	}
 
+	d.checked = false
 	delete(d.vertices, name)
 	return nil
 }
@@ -101,7 +130,8 @@ func (d *Dag[K, T]) AddEdge(from, to K) error {
 	return nil
 }
 
-// RemoveEdge removes the relationship between the vertex. There is no chance to create a cycle with this method. If the key of from vertex and the to vertex doesn't exist, an error is returned
+// RemoveEdge removes the relationship between the vertex. There is no chance to create a cycle with this method, but the topological batch might change.
+// If the key of from vertex and the to vertex doesn't exist, an error is returned
 func (d *Dag[K, T]) RemoveEdge(from, to K) error {
 	if from == to {
 		return fmt.Errorf("failed to remove edge, the from and to can not be the same")
@@ -117,88 +147,235 @@ func (d *Dag[K, T]) RemoveEdge(from, to K) error {
 		return fmt.Errorf("failed to remove edge, the to vertex %v doesn't exist", to)
 	}
 
+	d.checked = false
 	delete(fromVertex.outgoing, to)
 	delete(toVertex.incoming, from)
 	return nil
 }
 
-// IsChecked return if the dag is checked.
+// IsChecked return true if the graph is checked and there is no cycle in it.
 func (d *Dag[K, T]) IsChecked() bool {
 	return d.checked
 }
 
 // HasCycle checks if there is cycles in dag. The return values:
-//   - pass: if the check is passed, which means that there is no cycle in dag.
-//   - cycles: if the check is failed, the cycles will be returned.
+//   - yes: true means this graph is of dag and there is no cycle while false means that this graph is not a dag or it's not checked
+//   - cycles: if the graph is not a dag, the cycles will be returned.
 func (d *Dag[K, T]) CheckCycle() (bool, [][]K) {
 	if d.checked {
 		return true, nil
 	}
 
-	cp := d.Copy()
-	topo := make([][]*vertex[K, T], 0)
-	for len(cp.vertices) != 0 {
-		batch := make([]*vertex[K, T], 0)
-		for _, vertex := range cp.vertices {
-			if len(vertex.incoming) == 0 {
-				batch = append(batch, vertex)
-			}
-		}
-		if len(batch) == 0 {
-			return false, nil // TODO, add the cycles
-		}
-		for _, vertex := range batch {
-			cp.RemoveVertex(vertex.name)
-		}
-		topo = append(topo, batch)
-		for _, vertex := range batch {
-			vertex.batch = len(topo)
-		}
-	}
-	d.cachedTopo = topo
-	d.checked = true
+	d.cachedFullTopo = nil
+	d.cachedVertexTopo = sync.Map{}
 
+	d.checked = true
 	return true, nil
 }
 
 // TopologicalSort returns the topological sort of all vertices.
 func (d *Dag[K, T]) TopologicalSort() ([]T, error) {
-	if pass, _ := d.CheckCycle(); !pass {
-		return nil, errors.New("there is at least one cycle in the graph")
+	if !d.IsChecked() {
+		return nil, errors.New("the graph is not checked for acyclicity, please call CheckCycle first")
 	}
 
-	result := make([]T, 0, len(d.vertices))
-	for _, batch := range d.cachedTopo {
-		for _, vertex := range batch {
-			result = append(result, vertex.value)
+	if d.cachedFullTopo != nil {
+		return d.flatten(d.cachedFullTopo), nil
+	}
+
+	removed := make(map[K]struct{})
+	vertices := make(map[K]struct{})
+
+	for k := range d.vertices {
+		vertices[k] = struct{}{}
+	}
+
+	batches := make([][]T, 0)
+	for len(vertices) > 0 {
+		batchKeys := make([]K, 0)
+		for k := range vertices {
+			if d.countLeftIncoming(removed, nil, d.vertices[k]) == 0 {
+				batchKeys = append(batchKeys, k)
+			}
 		}
+		batch := make([]T, 0, len(batchKeys))
+		for _, k := range batchKeys {
+			removed[k] = struct{}{}
+			delete(vertices, k)
+			batch = append(batch, d.vertices[k].value)
+		}
+		batches = append(batches, batch)
 	}
-
-	return result, nil
+	d.cachedFullTopo = batches
+	return d.flatten(d.cachedFullTopo), nil
 }
 
-// TopologicalBatchFrom returns the batches according to the vertex referenced by the parameter. The order of returned batches is from farthest to nearest.
-func (d *Dag[K, T]) TopologicalBatchFrom(name K) ([][]T, error) {
-	if pass, _ := d.CheckCycle(); !pass {
-		return nil, errors.New("there is at least one cycle in the graph")
-	}
-
-	result := make([][]T, 0, len(d.cachedTopo))
-	for _, batch := range d.cachedTopo {
-		outputBatch := make([]T, 0, len(batch))
-		for _, vertex := range batch {
-			if len(result) == 0 && vertex.name != name {
+func (d *Dag[K, T]) countLeftIncoming(removed map[K]struct{}, limitation map[K]struct{}, vertex *vertex[K, T]) int {
+	left := 0
+	for k := range vertex.incoming {
+		if limitation != nil {
+			if _, exist := limitation[k]; !exist {
 				continue
 			}
-			outputBatch = append(outputBatch, vertex.value)
 		}
-		if len(outputBatch) == 0 {
-			continue
+		if _, exist := removed[k]; !exist {
+			left++
 		}
-		result = append(result, outputBatch)
+	}
+	return left
+}
+
+func (d *Dag[K, T]) countLeftOutgoing(removed map[K]struct{}, limitation map[K]struct{}, vertex *vertex[K, T]) int {
+	left := 0
+	for k := range vertex.outgoing {
+		if limitation != nil {
+			if _, exist := limitation[k]; !exist {
+				continue
+			}
+		}
+		if _, exist := removed[k]; !exist {
+			left++
+		}
+	}
+	return left
+}
+
+func (d *Dag[K, T]) flatten(batches [][]T) []T {
+	result := make([]T, 0, len(d.vertices))
+	for _, batch := range batches {
+		result = append(result, batch...)
+	}
+	return result
+}
+
+// TopologicalBatchFrom returns the batches calculated in the graph with roots specified by names. The order is from the nearest to the farthest. So for most time, you should checkout the batches reversely.
+//   - alignRight: by default, the nearest will be as far left as possible. But if this parameter is true, the nearest will be as far right as possible.
+//   - names: names specify the roots in the final result. If its length is zero, all the vertices will be considered.
+func (d *Dag[K, T]) TopologicalBatch(alignRight bool, names ...K) ([][]T, error) {
+	if !d.IsChecked() {
+		return nil, errors.New("the graph is not checked for acyclicity, please call CheckCycle first")
 	}
 
-	return result, nil
+	for _, name := range names {
+		if _, exist := d.vertices[name]; !exist {
+			return nil, fmt.Errorf("there is no vertex named %v", name)
+		}
+	}
+
+	if len(names) == 0 {
+		for _, vertex := range d.vertices {
+			names = append(names, vertex.name)
+		}
+	}
+	return d.topologicalBatchForSpecified(alignRight, names...)
+}
+
+func (d *Dag[K, T]) topologicalBatchForSpecified(alignRight bool, names ...K) ([][]T, error) {
+	deps := make(map[K]map[K]struct{})
+	for _, name := range names {
+		if value, ok := d.cachedVertexTopo.Load(name); ok {
+			typedValue, yes := value.(map[K]struct{})
+			if !yes {
+				return nil, fmt.Errorf("value type is not right, this must be a bug, please contact to the author")
+			}
+			deps[name] = typedValue
+		}
+	}
+
+	for _, name := range names {
+		if _, exist := deps[name]; exist {
+			continue
+		}
+		deps[name] = d.collectDependentKeys(name)
+	}
+
+	for name, path := range deps {
+		d.cachedVertexTopo.Store(name, path)
+	}
+
+	if alignRight {
+		return d.calculateTopologicalBatchWithAlignRight(deps), nil
+	} else {
+		return d.calculateTopologicalBatchWithAlignLeft(deps), nil
+	}
+}
+
+func (d *Dag[K, T]) collectDependentKeys(name K) map[K]struct{} {
+	result := make(map[K]struct{})
+	vertex := d.vertices[name]
+	result[name] = struct{}{}
+	for k := range vertex.outgoing {
+		d.dfsCollectDependentKeys(result, k)
+	}
+	return result
+}
+
+func (d *Dag[K, T]) calculateTopologicalBatchWithAlignLeft(deps map[K]map[K]struct{}) [][]T {
+	vertices := make(map[K]struct{})
+	limitation := make(map[K]struct{})
+	for _, dep := range deps {
+		for k := range dep {
+			vertices[k] = struct{}{}
+			limitation[k] = struct{}{}
+		}
+	}
+	removed := make(map[K]struct{})
+	batches := make([][]T, 0)
+	for len(vertices) > 0 {
+		batchKeys := make([]K, 0)
+		for k := range vertices {
+			if d.countLeftIncoming(removed, limitation, d.vertices[k]) == 0 {
+				batchKeys = append(batchKeys, k)
+			}
+		}
+		batch := make([]T, 0, len(batchKeys))
+		for _, k := range batchKeys {
+			removed[k] = struct{}{}
+			delete(vertices, k)
+			batch = append(batch, d.vertices[k].value)
+		}
+		batches = append(batches, batch)
+	}
+
+	return batches
+}
+
+func (d *Dag[K, T]) calculateTopologicalBatchWithAlignRight(deps map[K]map[K]struct{}) [][]T {
+	vertices := make(map[K]struct{})
+	limitation := make(map[K]struct{})
+	for _, dep := range deps {
+		for k := range dep {
+			vertices[k] = struct{}{}
+			limitation[k] = struct{}{}
+		}
+	}
+	removed := make(map[K]struct{})
+	batches := make([][]T, 0)
+	for len(vertices) > 0 {
+		batchKeys := make([]K, 0)
+		for k := range vertices {
+			if d.countLeftOutgoing(removed, limitation, d.vertices[k]) == 0 {
+				batchKeys = append(batchKeys, k)
+			}
+		}
+		batch := make([]T, 0, len(batchKeys))
+		for _, k := range batchKeys {
+			removed[k] = struct{}{}
+			delete(vertices, k)
+			batch = append(batch, d.vertices[k].value)
+		}
+		batches = append(batches, batch)
+	}
+
+	return batches
+}
+
+func (d *Dag[K, T]) dfsCollectDependentKeys(result map[K]struct{}, name K) {
+	result[name] = struct{}{}
+	vertex := d.vertices[name]
+	for k := range vertex.outgoing {
+		d.dfsCollectDependentKeys(result, k)
+	}
 }
 
 // String returns the string of dag, that can be useful for debug and logging.

@@ -77,9 +77,7 @@ func (v *Vector[T]) Reserve(capacity int) {
 		return
 	}
 	newData := make([]T, v.Length(), capacity)
-	for k, value := range v.data {
-		newData[k] = value
-	}
+	copy(newData, v.data)
 	v.data = newData
 }
 
