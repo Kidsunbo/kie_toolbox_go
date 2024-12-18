@@ -30,5 +30,7 @@ jobs:
       working-directory: ${{github.workspace}}/${{matrix.sub_module}}
       run: go test -v ./... -race -coverprofile=coverage.out -covermode=atomic
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+    - name: Upload coverage reports to Codecov with GitHub Action
+      uses: codecov/codecov-action@v5
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
