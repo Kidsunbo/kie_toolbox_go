@@ -159,7 +159,7 @@ func (d *Dag[K, T]) IsChecked() bool {
 }
 
 // HasCycle checks if there is cycles in dag. The return values:
-//   - yes: true means this graph is of dag and there is no cycle while false means that this graph is not a dag or it's not checked
+//   - pass: true means this graph is of dag and there is no cycle while false means that this graph is not a dag or it's not checked
 //   - cycles: if the graph is not a dag, the cycles will be returned.
 func (d *Dag[K, T]) CheckCycle() (bool, [][]K) {
 	if d.checked {
