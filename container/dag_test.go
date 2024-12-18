@@ -457,3 +457,19 @@ func TestTopologicalBatchReversely(t *testing.T) {
 	assert.ElementsMatch(t, tb[4], []int{3})
 	assert.ElementsMatch(t, tb[5], []int{1})
 }
+
+
+func TestCopy(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	dag.AddVertex(1, 1)
+	dag.AddVertex(2, 2)
+	dag.AddVertex(3, 3)
+	dag.AddVertex(4, 4)
+
+	dag.AddEdge(1, 2)
+	dag.AddEdge(2, 4)
+	dag.AddEdge(3, 4)
+	dagCp := dag.Copy()
+	assert.Equal(t, "debug_copy", dagCp.name)
+	assert.NotSame(t, dag.vertices, dagCp.vertices)
+}
