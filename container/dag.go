@@ -216,7 +216,9 @@ func (d *Dag[K, T]) dfsCheckCycle(key K, state map[K]int, low map[K]int, stack *
 			d.dfsCheckCycle(outKey, state, low, stack, onStack, id, sccCount)
 		}
 		if onStack[outKey] {
-			low[key] = min(low[key], low[outKey])
+			if low[key] > low[outKey] {
+				low[key] = low[outKey]
+			}
 		}
 	}
 
