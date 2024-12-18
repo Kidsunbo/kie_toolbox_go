@@ -1,6 +1,6 @@
 /*
 This library assumes that A is the root and the other vertices are the dependencies. By default, the E and F will be in the batch 3 and C will be in the batch 2.
-Sometimes, if you would like the vertex be executed eagerly, you could specify the align right.
+Sometimes, if you would like the vertex be executed eagerly, you could specify the order in reverse. As a result, the first batch will be E, F and C, then B and D with A in the last batch.
 
                    +---------+
                    |         |
@@ -249,9 +249,9 @@ func (d *Dag[K, T]) flatten(batches [][]T) []T {
 }
 
 // TopologicalBatchFrom returns the batches calculated in the graph with roots specified by names. The order is from the nearest to the farthest. So for most time, you should checkout the batches reversely.
-//   - alignRight: by default, the nearest will be as far left as possible. But if this parameter is true, the nearest will be as far right as possible.
+//   - reverse: by default, the roots are in the first batch and then sub-vertices of the first batch in the second batch in sequential order. If this parameter is true, the non-dependent vertices will be in the first batch and the order is opposite to the default.
 //   - names: names specify the roots in the final result. If its length is zero, all the vertices will be considered.
-func (d *Dag[K, T]) TopologicalBatch(alignRight bool, names ...K) ([][]T, error) {
+func (d *Dag[K, T]) TopologicalBatch(reverse bool, names ...K) ([][]T, error) {
 	if !d.IsChecked() {
 		return nil, errors.New("the graph is not checked for acyclicity, please call CheckCycle first")
 	}
@@ -267,10 +267,10 @@ func (d *Dag[K, T]) TopologicalBatch(alignRight bool, names ...K) ([][]T, error)
 			names = append(names, vertex.name)
 		}
 	}
-	return d.topologicalBatchForSpecified(alignRight, names...)
+	return d.topologicalBatchForSpecified(reverse, names...)
 }
 
-func (d *Dag[K, T]) topologicalBatchForSpecified(alignRight bool, names ...K) ([][]T, error) {
+func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, names ...K) ([][]T, error) {
 	deps := make(map[K]map[K]struct{})
 	for _, name := range names {
 		if value, ok := d.cachedVertexTopo.Load(name); ok {
@@ -293,10 +293,10 @@ func (d *Dag[K, T]) topologicalBatchForSpecified(alignRight bool, names ...K) ([
 		d.cachedVertexTopo.Store(name, path)
 	}
 
-	if alignRight {
-		return d.calculateTopologicalBatchWithAlignRight(deps), nil
+	if reverse {
+		return d.calculateTopologicalBatchReversely(deps), nil
 	} else {
-		return d.calculateTopologicalBatchWithAlignLeft(deps), nil
+		return d.calculateTopologicalBatchSequential(deps), nil
 	}
 }
 
@@ -310,7 +310,7 @@ func (d *Dag[K, T]) collectDependentKeys(name K) map[K]struct{} {
 	return result
 }
 
-func (d *Dag[K, T]) calculateTopologicalBatchWithAlignLeft(deps map[K]map[K]struct{}) [][]T {
+func (d *Dag[K, T]) calculateTopologicalBatchSequential(deps map[K]map[K]struct{}) [][]T {
 	vertices := make(map[K]struct{})
 	limitation := make(map[K]struct{})
 	for _, dep := range deps {
@@ -340,7 +340,7 @@ func (d *Dag[K, T]) calculateTopologicalBatchWithAlignLeft(deps map[K]map[K]stru
 	return batches
 }
 
-func (d *Dag[K, T]) calculateTopologicalBatchWithAlignRight(deps map[K]map[K]struct{}) [][]T {
+func (d *Dag[K, T]) calculateTopologicalBatchReversely(deps map[K]map[K]struct{}) [][]T {
 	vertices := make(map[K]struct{})
 	limitation := make(map[K]struct{})
 	for _, dep := range deps {
