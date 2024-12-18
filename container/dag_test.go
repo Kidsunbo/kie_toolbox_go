@@ -234,7 +234,7 @@ func TestTopologicalSort(t *testing.T) {
 	assert.ElementsMatch(t, dag.cachedFullTopo[3], []int{8})
 }
 
-func TestTopologicalBatchAlignLeft(t *testing.T) {
+func TestTopologicalBatchSequentially(t *testing.T) {
 	dag := NewDag[int, int]("debug")
 	assert.NoError(t, dag.AddVertex(1, 1))
 	assert.NoError(t, dag.AddVertex(2, 2))
@@ -325,7 +325,7 @@ func TestTopologicalBatchAlignLeft(t *testing.T) {
 	assert.ElementsMatch(t, tb[5], []int{7})
 }
 
-func TestTopologicalBatchAlignRight(t *testing.T) {
+func TestTopologicalBatchReversely(t *testing.T) {
 	dag := NewDag[int, int]("debug")
 	assert.NoError(t, dag.AddVertex(1, 1))
 	assert.NoError(t, dag.AddVertex(2, 2))

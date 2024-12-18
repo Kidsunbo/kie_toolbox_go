@@ -58,7 +58,7 @@ type Dag[K comparable, T any] struct {
 	vertices         map[K]*vertex[K, T]
 	checked          bool
 	cachedFullTopo   [][]T
-	cachedVertexTopo sync.Map // key: vertex name, value: map[K]struct{} (key: the dependency, value: the dependent key)
+	cachedVertexTopo sync.Map // key: vertex name, value: map[K]struct{} (key: the dependency, value: the dependent keys)
 }
 
 // NewDag create a directed acycle graph with each vertex whose key is of type K and the value is of type T.
@@ -296,7 +296,7 @@ func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, names ...K) ([][]
 	if reverse {
 		return d.calculateTopologicalBatchReversely(deps), nil
 	} else {
-		return d.calculateTopologicalBatchSequential(deps), nil
+		return d.calculateTopologicalBatchSequentially(deps), nil
 	}
 }
 
@@ -310,7 +310,7 @@ func (d *Dag[K, T]) collectDependentKeys(name K) map[K]struct{} {
 	return result
 }
 
-func (d *Dag[K, T]) calculateTopologicalBatchSequential(deps map[K]map[K]struct{}) [][]T {
+func (d *Dag[K, T]) calculateTopologicalBatchSequentially(deps map[K]map[K]struct{}) [][]T {
 	vertices := make(map[K]struct{})
 	limitation := make(map[K]struct{})
 	for _, dep := range deps {
@@ -380,11 +380,14 @@ func (d *Dag[K, T]) dfsCollectDependentKeys(result map[K]struct{}, name K) {
 
 // String returns the string of dag, that can be useful for debug and logging.
 func (d *Dag[K, T]) String() string {
-	if pass, cycles := d.CheckCycle(); !pass {
-		return fmt.Sprintf("there are cycles in the graph, cycles are %v", cycles)
+	if !d.IsChecked() {
+		return fmt.Sprintf("name: %v, message: not checked", d.name)
 	}
-
-	return fmt.Sprint(d.TopologicalSort())
+	output, err := d.TopologicalSort()
+	if err != nil {
+		return fmt.Sprintf("name: %v, err: %v", d.name, err)
+	}
+	return fmt.Sprintf("name: %v, %v", d.name, output)
 }
 
 // Copy will copy the whole graph but the cached data.
