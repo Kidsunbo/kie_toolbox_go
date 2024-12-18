@@ -169,8 +169,71 @@ func (d *Dag[K, T]) CheckCycle() (bool, [][]K) {
 	d.cachedFullTopo = nil
 	d.cachedVertexTopo = sync.Map{}
 
+	if len(d.vertices) == 0 {
+		d.checked = true
+		return true, nil
+	}
+
+	state := make(map[K]int, len(d.vertices))
+	low := make(map[K]int, len(d.vertices))
+	onStack := make(map[K]bool, len(d.vertices))
+	id := 1
+	sccCount := 0
+	stack := make([]K, 0, len(d.vertices))
+	for k := range d.vertices {
+		if state[k] == 0 {
+			d.dfsCheckCycle(k, state, low, &stack, onStack, &id, &sccCount)
+		}
+	}
+	if sccCount != len(d.vertices) {
+		rev := make(map[int][]K)
+		for k, v := range low {
+			rev[v] = append(rev[v], k)
+		}
+		cycles := make([][]K, 0)
+		for _, k := range rev {
+			if len(k) > 1 {
+				cycles = append(cycles, k)
+			}
+		}
+		return false, cycles
+	}
+
 	d.checked = true
 	return true, nil
+}
+
+func (d *Dag[K, T]) dfsCheckCycle(key K, state map[K]int, low map[K]int, stack *[]K, onStack map[K]bool, id *int, sccCount *int) {
+	*stack = append(*stack, key)
+	onStack[key] = true
+	state[key] = *id
+	low[key] = *id
+	*id++
+
+	vertex := d.vertices[key]
+	for outKey := range vertex.outgoing {
+		if state[outKey] == 0 {
+			d.dfsCheckCycle(outKey, state, low, stack, onStack, id, sccCount)
+		}
+		if onStack[outKey] {
+			low[key] = min(low[key], low[outKey])
+		}
+	}
+
+	if state[key] == low[key] {
+		value := (*stack)[len(*stack)-1]
+		*stack = (*stack)[:len(*stack)-1]
+		for {
+			onStack[value] = false
+			low[value] = state[key]
+			if value == key {
+				break
+			}
+			value = (*stack)[len(*stack)-1]
+			*stack = (*stack)[:len(*stack)-1]
+		}
+		*sccCount++
+	}
 }
 
 // TopologicalSort returns the topological sort of all vertices.

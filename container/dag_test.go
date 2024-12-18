@@ -1,6 +1,7 @@
 package container
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -178,12 +179,53 @@ func TestCheckCycle(t *testing.T) {
 	assert.Nil(t, cycles)
 	assert.True(t, dag.IsChecked())
 
-	// assert.NoError(t, dag.AddEdge(4, 1))
-	// assert.False(t, dag.IsChecked())
-	// pass, cycles = dag.CheckCycle()
-	// assert.False(t, pass)
-	// assert.Nil(t, cycles)
-	// assert.False(t, dag.IsChecked())
+	assert.NoError(t, dag.AddEdge(4, 1))
+	assert.False(t, dag.IsChecked())
+	pass, cycles = dag.CheckCycle()
+	assert.False(t, pass)
+	assert.Equal(t, 1, len(cycles))
+	assert.ElementsMatch(t, cycles[0], []int{1, 2, 4})
+	assert.False(t, dag.IsChecked())
+
+	assert.NoError(t, dag.RemoveEdge(4, 1))
+	pass, cycles = dag.CheckCycle()
+	assert.True(t, pass)
+	assert.Nil(t, cycles)
+	assert.True(t, dag.IsChecked())
+
+	assert.NoError(t, dag.AddVertex(5, 5))
+	assert.NoError(t, dag.AddVertex(6, 6))
+	assert.NoError(t, dag.AddVertex(7, 7))
+	assert.NoError(t, dag.AddVertex(8, 8))
+	assert.NoError(t, dag.AddVertex(9, 9))
+	assert.NoError(t, dag.AddVertex(10, 10))
+	assert.NoError(t, dag.AddVertex(11, 11))
+	assert.NoError(t, dag.AddVertex(12, 12))
+	assert.NoError(t, dag.AddVertex(13, 13))
+	assert.NoError(t, dag.AddEdge(4, 5))
+	assert.NoError(t, dag.AddEdge(5, 7))
+	assert.NoError(t, dag.AddEdge(7, 6))
+	assert.NoError(t, dag.AddEdge(6, 2))
+	assert.NoError(t, dag.AddEdge(8, 9))
+	assert.NoError(t, dag.AddEdge(9, 10))
+	assert.NoError(t, dag.AddEdge(10, 11))
+	assert.NoError(t, dag.AddEdge(10, 8))
+	assert.NoError(t, dag.AddEdge(12, 13))
+	assert.NoError(t, dag.AddEdge(13, 12))
+	assert.False(t, dag.IsChecked())
+	pass, cycles = dag.CheckCycle()
+	assert.False(t, pass)
+	assert.Equal(t, 3, len(cycles))
+	sort.Slice(cycles, func(i, j int) bool {
+		sort.Ints(cycles[i])
+		sort.Ints(cycles[j])
+		return cycles[i][0] < cycles[j][0]
+	})
+	assert.ElementsMatch(t, cycles[0], []int{2, 4, 5, 6, 7})
+	assert.ElementsMatch(t, cycles[1], []int{8, 9, 10})
+	assert.ElementsMatch(t, cycles[2], []int{12, 13})
+	assert.False(t, dag.IsChecked())
+
 }
 
 func TestTopologicalSort(t *testing.T) {
