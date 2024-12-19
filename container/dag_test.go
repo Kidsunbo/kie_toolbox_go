@@ -61,6 +61,24 @@ func TestRemoveVertex(t *testing.T) {
 	assert.False(t, dag.checked.Load())
 }
 
+func TestGetAllVertex(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	assert.NoError(t, dag.AddVertex(1, 1))
+	assert.NoError(t, dag.AddVertex(2, 2))
+	assert.NoError(t, dag.AddVertex(3, 3))
+	assert.NoError(t, dag.AddVertex(4, 4))
+	assert.NoError(t, dag.AddVertex(5, 5))
+	assert.NoError(t, dag.AddVertex(6, 6))
+	assert.NoError(t, dag.AddVertex(7, 7))
+	assert.NoError(t, dag.AddVertex(8, 8))
+
+	assert.ElementsMatch(t, dag.GetAllVertices(), []int{1, 2, 3, 4, 5, 6, 7, 8})
+
+	dag.RemoveVertex(3)
+	assert.ElementsMatch(t, dag.GetAllVertices(), []int{1, 2, 4, 5, 6, 7, 8})
+
+}
+
 func TestHasVertex(t *testing.T) {
 	dag := NewDag[int, int]("debug")
 	assert.NoError(t, dag.AddVertex(1, 1))
@@ -711,7 +729,6 @@ func BenchmarkDag(b *testing.B) {
 
 }
 
-
 func BenchmarkDag2(b *testing.B) {
 	dag := NewDag[int, int]("debug")
 	for i := 0; i < 100; i++ {
@@ -783,4 +800,3 @@ func BenchmarkDag3(b *testing.B) {
 	wg.Wait()
 
 }
-
