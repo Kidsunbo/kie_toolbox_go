@@ -1,6 +1,13 @@
 /*
-This library assumes that A is the root and the other vertices are the dependencies. By default, the E and F will be in the batch 3 and C will be in the batch 2.
-Sometimes, if you would like the vertex be executed eagerly, you could specify the order in reverse. As a result, the first batch will be E, F and C, then B and D with A in the last batch.
+For thread-safe:
+	This library can support thread-safe, while you can also get a good performance if you disable the thread-safe feature while limit your way to use it. Passing ConfigDisableThreadSafe(true) to NewDag
+	will disable the thread-safe and you will gain almost 2 to 3 times improvement in performance. But be aware that if you disable the thread-safe feature, you can never modify the vertex and
+	edge in pararrel.
+
+
+For alignment:
+	This library assumes that A is the root and the other vertices are the dependencies. By default, the E and F will be in the batch 3 and C will be in the batch 2.
+	Sometimes, if you would like the vertex be executed eagerly, you could specify the order in reverse. As a result, the first batch will be E, F and C, then B and D with A in the last batch.
 
                    +---------+
                    |         |
@@ -31,7 +38,10 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 )
+
+type ConfigDisableThreadSafe bool
 
 type vertex[K comparable, T any] struct {
 	name     K
@@ -54,29 +64,41 @@ func (v *vertex[K, T]) String() string {
 }
 
 type Dag[K comparable, T any] struct {
-	mu               sync.Mutex
-	name             string
-	vertices         map[K]*vertex[K, T]
-	checked          bool
+	mu           sync.RWMutex
+	disableMutex bool
+	name         string
+	vertices     map[K]*vertex[K, T]
+
+	checked          atomic.Bool
+	cacheLock        sync.RWMutex
 	cachedFullTopo   [][]T
 	cachedVertexTopo map[K]map[K]struct{} // key: vertex name, value: map[K]struct{} (key: the dependency, value: the dependent keys)
 }
 
 // NewDag create a directed acycle graph with each vertex whose key is of type K and the value is of type T.
 // Normally, the name is of a string which keep unique in the whole graph. The value can be different.
-func NewDag[K comparable, T any](name string) *Dag[K, T] {
+func NewDag[K comparable, T any](name string, params ...any) *Dag[K, T] {
+	disableMutex := false
+	for _, param := range params {
+		if v, ok := param.(ConfigDisableThreadSafe); ok {
+			disableMutex = bool(v)
+		}
+	}
+
 	return &Dag[K, T]{
-		mu:       sync.Mutex{},
-		name:     name,
-		vertices: map[K]*vertex[K, T]{},
-		checked:  false,
+		mu:           sync.RWMutex{},
+		disableMutex: disableMutex,
+		name:         name,
+		vertices:     map[K]*vertex[K, T]{},
 	}
 }
 
 // AddVertex add the vertex into the dag. Because adding new vertex might cause a cycle in the graph, so it will make the dag unchecked.
 func (d *Dag[K, T]) AddVertex(name K, value T) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	if !d.disableMutex {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+	}
 
 	return d.addVertex(name, value)
 }
@@ -85,15 +107,17 @@ func (d *Dag[K, T]) addVertex(name K, value T) error {
 	if _, exist := d.vertices[name]; exist {
 		return fmt.Errorf("failed to add vertex, vertex %v already exist", name)
 	}
-	d.checked = false
+	d.setChecked(false)
 	d.vertices[name] = newVertex(name, value)
 	return nil
 }
 
 // RemoveVertex removes the vertex from the dag. There is no chance to create cycle in the graph, but the topological batch might change.
 func (d *Dag[K, T]) RemoveVertex(name K) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	if !d.disableMutex {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+	}
 
 	return d.removeVertex(name)
 }
@@ -112,15 +136,17 @@ func (d *Dag[K, T]) removeVertex(name K) error {
 		d.removeEdge(cur.name, vertex.name)
 	}
 
-	d.checked = false
+	d.setChecked(false)
 	delete(d.vertices, name)
 	return nil
 }
 
 // HasVertex only checks if the vertex has been added to the dag.
 func (d *Dag[K, T]) HasVertex(name K) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	if !d.disableMutex {
+		d.mu.RLock()
+		defer d.mu.RUnlock()
+	}
 
 	return d.hasVertex(name)
 }
@@ -132,8 +158,10 @@ func (d *Dag[K, T]) hasVertex(name K) bool {
 
 // AddEdge adds the relationship between two vertex, which might cause a cycle in dag. If the key of from vertex and the to vertex doesn't exist, an error is returned
 func (d *Dag[K, T]) AddEdge(from, to K) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	if !d.disableMutex {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+	}
 
 	return d.addEdge(from, to)
 }
@@ -153,7 +181,7 @@ func (d *Dag[K, T]) addEdge(from, to K) error {
 		return fmt.Errorf("failed to add edge, the to vertex %v doesn't exist", to)
 	}
 
-	d.checked = false
+	d.setChecked(false)
 	fromVertex.outgoing[toVertex.name] = toVertex
 	toVertex.incoming[fromVertex.name] = fromVertex
 
@@ -163,8 +191,10 @@ func (d *Dag[K, T]) addEdge(from, to K) error {
 // RemoveEdge removes the relationship between the vertex. There is no chance to create a cycle with this method, but the topological batch might change.
 // If the key of from vertex and the to vertex doesn't exist, an error is returned
 func (d *Dag[K, T]) RemoveEdge(from, to K) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	if !d.disableMutex {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+	}
 
 	return d.removeEdge(from, to)
 }
@@ -184,7 +214,7 @@ func (d *Dag[K, T]) removeEdge(from, to K) error {
 		return fmt.Errorf("failed to remove edge, the to vertex %v doesn't exist", to)
 	}
 
-	d.checked = false
+	d.setChecked(false)
 	delete(fromVertex.outgoing, to)
 	delete(toVertex.incoming, from)
 	return nil
@@ -192,25 +222,31 @@ func (d *Dag[K, T]) removeEdge(from, to K) error {
 
 // IsChecked return true if the graph is checked and there is no cycle in it.
 func (d *Dag[K, T]) IsChecked() bool {
-	return d.checked
+	return d.readChecked()
 }
 
 // HasCycle checks if there is cycles in dag. The return values:
 //   - pass: true means this graph is of dag and there is no cycle while false means that this graph is not a dag or it's not checked
 //   - cycles: if the graph is not a dag, the cycles will be returned.
 func (d *Dag[K, T]) CheckCycle() (bool, [][]K) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	if !d.disableMutex {
+		d.mu.RLock()
+		defer d.mu.RUnlock()
+	}
 
-	if d.checked {
+	if d.readChecked() {
 		return true, nil
 	}
 
-	d.cachedFullTopo = nil
-	d.cachedVertexTopo = make(map[K]map[K]struct{})
+	func() {
+		d.cacheLock.Lock()
+		defer d.cacheLock.Unlock()
+		d.cachedFullTopo = nil
+		d.cachedVertexTopo = make(map[K]map[K]struct{}, len(d.vertices))
+	}()
 
 	if len(d.vertices) == 0 {
-		d.checked = true
+		d.setChecked(true)
 		return true, nil
 	}
 
@@ -239,7 +275,7 @@ func (d *Dag[K, T]) CheckCycle() (bool, [][]K) {
 		return false, cycles
 	}
 
-	d.checked = true
+	d.setChecked(true)
 	return true, nil
 }
 
@@ -280,19 +316,24 @@ func (d *Dag[K, T]) dfsCheckCycle(key K, state map[K]int, low map[K]int, stack *
 
 // TopologicalSort returns the topological sort of all vertices.
 func (d *Dag[K, T]) TopologicalSort() ([]T, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	if !d.disableMutex {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+	}
 
 	return d.topologicalSort()
 }
 
 func (d *Dag[K, T]) topologicalSort() ([]T, error) {
-	if !d.checked {
+	if !d.readChecked() {
 		return nil, errors.New("the graph is not checked for acyclicity, please call CheckCycle first")
 	}
 
-	if d.cachedFullTopo != nil {
-		return d.flatten(d.cachedFullTopo), nil
+	d.cacheLock.RLock()
+	cachedFullTopo := d.cachedFullTopo
+	d.cacheLock.RUnlock()
+	if cachedFullTopo != nil {
+		return d.flatten(cachedFullTopo), nil
 	}
 
 	removed := make(map[K]struct{})
@@ -318,8 +359,10 @@ func (d *Dag[K, T]) topologicalSort() ([]T, error) {
 		}
 		batches = append(batches, batch)
 	}
+	d.cacheLock.Lock()
 	d.cachedFullTopo = batches
-	return d.flatten(d.cachedFullTopo), nil
+	d.cacheLock.Unlock()
+	return d.flatten(batches), nil
 }
 
 func (d *Dag[K, T]) countLeftIncoming(removed map[K]struct{}, limitation map[K]struct{}, vertex *vertex[K, T]) int {
@@ -364,14 +407,16 @@ func (d *Dag[K, T]) flatten(batches [][]T) []T {
 //   - reverse: by default, the roots are in the first batch and then sub-vertices of the first batch in the second batch in sequential order. If this parameter is true, the non-dependent vertices will be in the first batch and the order is opposite to the default.
 //   - names: names specify the roots in the final result. If its length is zero, all the vertices will be considered.
 func (d *Dag[K, T]) TopologicalBatch(reverse bool, names ...K) ([][]T, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	if !d.disableMutex {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+	}
 
 	return d.topologicalBatch(reverse, names...)
 }
 
 func (d *Dag[K, T]) topologicalBatch(reverse bool, names ...K) ([][]T, error) {
-	if !d.checked {
+	if !d.readChecked() {
 		return nil, errors.New("the graph is not checked for acyclicity, please call CheckCycle first")
 	}
 
@@ -390,22 +435,33 @@ func (d *Dag[K, T]) topologicalBatch(reverse bool, names ...K) ([][]T, error) {
 }
 
 func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, names ...K) ([][]T, error) {
-	deps := make(map[K]map[K]struct{})
+	deps := make(map[K]map[K]struct{}, len(names))
+
+	// this will boost the speed than lock in every loop
+	d.cacheLock.RLock()
 	for _, name := range names {
 		if value, ok := d.cachedVertexTopo[name]; ok {
 			deps[name] = value
 		}
 	}
+	d.cacheLock.RUnlock()
 
+	needUpdateCache := false
 	for _, name := range names {
 		if _, exist := deps[name]; exist {
 			continue
 		}
+		needUpdateCache = true
 		deps[name] = d.collectDependentKeys(name)
 	}
-
-	for name, path := range deps {
-		d.cachedVertexTopo[name] = path
+	if needUpdateCache {
+		func() {
+			d.cacheLock.Lock()
+			defer d.cacheLock.Unlock()
+			for name, path := range deps {
+				d.cachedVertexTopo[name] = path
+			}
+		}()
 	}
 
 	if reverse {
@@ -495,7 +551,12 @@ func (d *Dag[K, T]) dfsCollectDependentKeys(result map[K]struct{}, name K) {
 
 // String returns the string of dag, that can be useful for debug and logging.
 func (d *Dag[K, T]) String() string {
-	if !d.checked {
+	if !d.disableMutex {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+	}
+
+	if !d.readChecked() {
 		return fmt.Sprintf("name: %v, message: not checked", d.name)
 	}
 	output, err := d.topologicalSort()
@@ -524,9 +585,18 @@ func (d *Dag[K, T]) Copy() *Dag[K, T] {
 	}
 
 	cpDag := NewDag[K, T](d.name + "_copy")
-	cpDag.checked = d.checked
+	cpDag.checked.Store(d.checked.Load())
 	cpDag.vertices = cpVertices
-	cpDag.mu = sync.Mutex{}
+	cpDag.disableMutex = d.disableMutex
 
 	return cpDag
+}
+
+func (d *Dag[K, T]) readChecked() bool {
+	data := d.checked.Load()
+	return data
+}
+
+func (d *Dag[K, T]) setChecked(data bool) {
+	d.checked.Store(data)
 }

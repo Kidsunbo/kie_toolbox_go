@@ -33,7 +33,7 @@ func TestAddVertex(t *testing.T) {
 	assert.Equal(t, 0, len(dag.cachedFullTopo))
 	assert.Equal(t, "debug", dag.name)
 	assert.Equal(t, 8, len(dag.vertices))
-	assert.False(t, dag.checked)
+	assert.False(t, dag.checked.Load())
 }
 
 func TestRemoveVertex(t *testing.T) {
@@ -50,7 +50,7 @@ func TestRemoveVertex(t *testing.T) {
 	assert.Equal(t, 0, len(dag.cachedFullTopo))
 	assert.Equal(t, "debug", dag.name)
 	assert.Equal(t, 8, len(dag.vertices))
-	assert.False(t, dag.checked)
+	assert.False(t, dag.checked.Load())
 
 	assert.NoError(t, dag.RemoveVertex(4))
 	assert.EqualError(t, dag.RemoveVertex(4), "failed to remove vertex, vertex 4 doesn't exist")
@@ -58,7 +58,7 @@ func TestRemoveVertex(t *testing.T) {
 	assert.Equal(t, 0, len(dag.cachedFullTopo))
 	assert.Equal(t, "debug", dag.name)
 	assert.Equal(t, 7, len(dag.vertices))
-	assert.False(t, dag.checked)
+	assert.False(t, dag.checked.Load())
 }
 
 func TestHasVertex(t *testing.T) {
@@ -478,17 +478,17 @@ func TestCopy(t *testing.T) {
 func TestRaceAdd(t *testing.T) {
 	dag := NewDag[string, string]("debug")
 	wg := sync.WaitGroup{}
-	wg.Add(100)
-	for i := 0; i < 100; i++ {
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
 		key := i
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 1000; i++ {
+			for i := 0; i < 10000; i++ {
 				v := fmt.Sprintf("%v_%v", key, i)
 				dag.AddVertex(v, v)
 			}
 
-			for i := 0; i < 1000; i++ {
+			for i := 0; i < 10000; i++ {
 				v := fmt.Sprintf("%v_%v", key, i)
 				dag.RemoveVertex(v)
 			}
@@ -496,7 +496,6 @@ func TestRaceAdd(t *testing.T) {
 	}
 	wg.Wait()
 }
-
 
 func TestRaceSort(t *testing.T) {
 	dag := NewDag[int, int]("debug")
@@ -518,7 +517,7 @@ func TestRaceSort(t *testing.T) {
 	dag.AddEdge(2, 3)
 
 	dag.CheckCycle()
-	
+
 	wg := sync.WaitGroup{}
 	wg.Add(10)
 	for i := 0; i < 10; i++ {
@@ -531,3 +530,257 @@ func TestRaceSort(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestRaceSortNoThreadSafeNoCheckCycle(t *testing.T) {
+	dag := NewDag[int, int]("debug", ConfigDisableThreadSafe(true))
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+
+	dag.CheckCycle()
+
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 5000; i++ {
+				dag.TopologicalSort()
+				dag.TopologicalBatch(false)
+				dag.TopologicalBatch(true)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestRaceSortNoThreadSafeButCheckCycle(t *testing.T) {
+	dag := NewDag[int, int]("debug", ConfigDisableThreadSafe(true))
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 5000; i++ {
+				dag.CheckCycle()
+				dag.TopologicalSort()
+				dag.TopologicalBatch(false)
+				dag.TopologicalBatch(true)
+				dag.setChecked(false)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestRaceSortThreadSafeAndCheckCycle(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 5000; i++ {
+				dag.CheckCycle()
+				dag.TopologicalSort()
+				dag.TopologicalBatch(false)
+				dag.TopologicalBatch(true)
+				dag.setChecked(false)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestRaceSortThreadSafeNoCheckCycle(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+	dag.CheckCycle()
+
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 5000; i++ {
+				dag.TopologicalSort()
+				dag.TopologicalBatch(false)
+				dag.TopologicalBatch(true)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func BenchmarkDag(b *testing.B) {
+	dag := NewDag[int, int]("debug")
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < b.N; i++ {
+				dag.CheckCycle()
+				dag.TopologicalSort()
+				dag.TopologicalBatch(false)
+				dag.TopologicalBatch(true)
+				dag.setChecked(false)
+			}
+		}()
+	}
+	wg.Wait()
+
+}
+
+
+func BenchmarkDag2(b *testing.B) {
+	dag := NewDag[int, int]("debug")
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+	dag.CheckCycle()
+
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < b.N; i++ {
+				dag.TopologicalSort()
+				dag.TopologicalBatch(false)
+				dag.TopologicalBatch(true)
+			}
+		}()
+	}
+	wg.Wait()
+
+}
+
+func BenchmarkDag3(b *testing.B) {
+	dag := NewDag[int, int]("debug", ConfigDisableThreadSafe(true))
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+	dag.CheckCycle()
+
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < b.N; i++ {
+				dag.TopologicalSort()
+				dag.TopologicalBatch(false)
+				dag.TopologicalBatch(true)
+			}
+		}()
+	}
+	wg.Wait()
+
+}
+
