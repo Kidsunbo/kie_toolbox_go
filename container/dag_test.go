@@ -1,7 +1,9 @@
 package container
 
 import (
+	"fmt"
 	"sort"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -304,15 +306,15 @@ func TestTopologicalBatchSequentially(t *testing.T) {
 	assert.ElementsMatch(t, tb[2], []int{4})
 	assert.ElementsMatch(t, tb[3], []int{6, 7})
 	assert.ElementsMatch(t, tb[4], []int{8})
-	cachedData, ok := dag.cachedVertexTopo.Load(1)
+	cachedData, ok := dag.cachedVertexTopo[1]
 	assert.True(t, ok)
-	assert.ElementsMatch(t, mapToSlice(cachedData.(map[int]struct{})), mapToSlice(map[int]struct{}{1: {}, 3: {}, 4: {}, 6: {}, 7: {}, 8: {}}))
-	cachedData, ok = dag.cachedVertexTopo.Load(8)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{1: {}, 3: {}, 4: {}, 6: {}, 7: {}, 8: {}}))
+	cachedData, ok = dag.cachedVertexTopo[8]
 	assert.True(t, ok)
-	assert.ElementsMatch(t, mapToSlice(cachedData.(map[int]struct{})), mapToSlice(map[int]struct{}{8: {}}))
-	cachedData, ok = dag.cachedVertexTopo.Load(2)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{8: {}}))
+	cachedData, ok = dag.cachedVertexTopo[2]
 	assert.True(t, ok)
-	assert.ElementsMatch(t, mapToSlice(cachedData.(map[int]struct{})), mapToSlice(map[int]struct{}{2: {}, 5: {}, 7: {}, 8: {}}))
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{2: {}, 5: {}, 7: {}, 8: {}}))
 
 	assert.NoError(t, dag.RemoveEdge(1, 3))
 	assert.NoError(t, dag.RemoveEdge(1, 4))
@@ -395,15 +397,15 @@ func TestTopologicalBatchReversely(t *testing.T) {
 	assert.ElementsMatch(t, tb[2], []int{5, 4})
 	assert.ElementsMatch(t, tb[3], []int{3, 2})
 	assert.ElementsMatch(t, tb[4], []int{1})
-	cachedData, ok := dag.cachedVertexTopo.Load(1)
+	cachedData, ok := dag.cachedVertexTopo[1]
 	assert.True(t, ok)
-	assert.ElementsMatch(t, mapToSlice(cachedData.(map[int]struct{})), mapToSlice(map[int]struct{}{1: {}, 3: {}, 4: {}, 6: {}, 7: {}, 8: {}}))
-	cachedData, ok = dag.cachedVertexTopo.Load(8)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{1: {}, 3: {}, 4: {}, 6: {}, 7: {}, 8: {}}))
+	cachedData, ok = dag.cachedVertexTopo[8]
 	assert.True(t, ok)
-	assert.ElementsMatch(t, mapToSlice(cachedData.(map[int]struct{})), mapToSlice(map[int]struct{}{8: {}}))
-	cachedData, ok = dag.cachedVertexTopo.Load(2)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{8: {}}))
+	cachedData, ok = dag.cachedVertexTopo[2]
 	assert.True(t, ok)
-	assert.ElementsMatch(t, mapToSlice(cachedData.(map[int]struct{})), mapToSlice(map[int]struct{}{2: {}, 5: {}, 7: {}, 8: {}}))
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{2: {}, 5: {}, 7: {}, 8: {}}))
 
 	assert.NoError(t, dag.RemoveEdge(1, 3))
 	assert.NoError(t, dag.RemoveEdge(1, 4))
@@ -458,7 +460,6 @@ func TestTopologicalBatchReversely(t *testing.T) {
 	assert.ElementsMatch(t, tb[5], []int{1})
 }
 
-
 func TestCopy(t *testing.T) {
 	dag := NewDag[int, int]("debug")
 	dag.AddVertex(1, 1)
@@ -472,4 +473,61 @@ func TestCopy(t *testing.T) {
 	dagCp := dag.Copy()
 	assert.Equal(t, "debug_copy", dagCp.name)
 	assert.NotSame(t, dag.vertices, dagCp.vertices)
+}
+
+func TestRaceAdd(t *testing.T) {
+	dag := NewDag[string, string]("debug")
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		key := i
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 1000; i++ {
+				v := fmt.Sprintf("%v_%v", key, i)
+				dag.AddVertex(v, v)
+			}
+
+			for i := 0; i < 1000; i++ {
+				v := fmt.Sprintf("%v_%v", key, i)
+				dag.RemoveVertex(v)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+
+func TestRaceSort(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+
+	dag.CheckCycle()
+	
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer wg.Done()
+			dag.TopologicalSort()
+			dag.TopologicalBatch(false)
+			dag.TopologicalBatch(true)
+		}()
+	}
+	wg.Wait()
 }
