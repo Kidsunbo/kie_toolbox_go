@@ -112,6 +112,23 @@ func (d *Dag[K, T]) addVertex(name K, value T) error {
 	return nil
 }
 
+func (d *Dag[K, T]) GetAllVertices() []T {
+	if !d.disableMutex {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+	}
+
+	return d.getAllVertices()
+}
+
+func (d *Dag[K, T]) getAllVertices() []T {
+	result := make([]T, 0, len(d.vertices))
+	for _, v := range d.vertices {
+		result = append(result, v.value)
+	}
+	return result
+}
+
 // RemoveVertex removes the vertex from the dag. There is no chance to create cycle in the graph, but the topological batch might change.
 func (d *Dag[K, T]) RemoveVertex(name K) error {
 	if !d.disableMutex {
