@@ -644,10 +644,16 @@ func (d *Dag[K, T]) Dot() string {
 }
 
 // Copy will copy the whole graph but the cached data.
-func (d *Dag[K, T]) Copy() *Dag[K, T] {
+func (d *Dag[K, T]) Copy(valueCopyFunction func(T) T) *Dag[K, T] {
+	if valueCopyFunction == nil {
+		valueCopyFunction = func(t T) T {
+			return t
+		}
+	}
 	cpVertices := make(map[K]*vertex[K, T])
 	for _, vertex := range d.vertices {
-		v := newVertex(vertex.name, vertex.value)
+		value := valueCopyFunction(vertex.value)
+		v := newVertex(vertex.name, value)
 		cpVertices[v.name] = v
 	}
 
