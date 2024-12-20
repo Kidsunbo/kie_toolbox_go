@@ -37,6 +37,7 @@ package container
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -608,11 +609,21 @@ func (d *Dag[K, T]) String() string {
 	if !d.readChecked() {
 		return fmt.Sprintf("name: %v, message: not checked", d.name)
 	}
-	output, err := d.topologicalSort()
-	if err != nil {
-		return fmt.Sprintf("name: %v, err: %v", d.name, err)
+
+	sb := strings.Builder{}
+	sb.WriteString("digraph G {\n")
+
+	for _, vertex := range d.vertices {
+		if len(vertex.outgoing) == 0 {
+			sb.WriteString(fmt.Sprintf("  %v;\n", vertex.name))
+		}
+		for _, outgoing := range vertex.outgoing {
+			sb.WriteString(fmt.Sprintf("  %v -> %v;\n", vertex.name, outgoing.name))
+		}
 	}
-	return fmt.Sprintf("name: %v, %v", d.name, output)
+
+	sb.WriteString("}\n")
+	return sb.String()
 }
 
 // Copy will copy the whole graph but the cached data.
