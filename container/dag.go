@@ -610,6 +610,23 @@ func (d *Dag[K, T]) String() string {
 		return fmt.Sprintf("name: %v, message: not checked", d.name)
 	}
 
+	output, err := d.topologicalSort()
+	if err != nil {
+		return fmt.Sprintf("name: %v, err: %v", d.name, err)
+	}
+	return fmt.Sprintf("name: %v, %v", d.name, output)
+}
+
+func (d *Dag[K, T]) Dot() string {
+	if !d.disableMutex {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+	}
+
+	if !d.readChecked() {
+		return fmt.Sprintf("name: %v, message: not checked", d.name)
+	}
+
 	sb := strings.Builder{}
 	sb.WriteString("digraph G {\n")
 
