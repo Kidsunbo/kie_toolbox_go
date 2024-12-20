@@ -41,7 +41,11 @@ import (
 	"sync/atomic"
 )
 
-type ConfigDisableThreadSafe bool
+type Flag struct{ id int }
+type AlreadyDone[T any] []T
+
+var DisableThreadSafe = Flag{id: 1}
+var Reverse = Flag{id: 2}
 
 type vertex[K comparable, T any] struct {
 	name     K
@@ -80,8 +84,8 @@ type Dag[K comparable, T any] struct {
 func NewDag[K comparable, T any](name string, params ...any) *Dag[K, T] {
 	disableMutex := false
 	for _, param := range params {
-		if v, ok := param.(ConfigDisableThreadSafe); ok {
-			disableMutex = bool(v)
+		if v, ok := param.(Flag); ok && v == DisableThreadSafe {
+			disableMutex = true
 		}
 	}
 
@@ -421,18 +425,39 @@ func (d *Dag[K, T]) flatten(batches [][]T) []T {
 }
 
 // TopologicalBatchFrom returns the batches calculated in the graph with roots specified by names. The order is from the nearest to the farthest. So for most time, you should checkout the batches reversely.
-//   - reverse: by default, the roots are in the first batch and then sub-vertices of the first batch in the second batch in sequential order. If this parameter is true, the non-dependent vertices will be in the first batch and the order is opposite to the default.
-//   - names: names specify the roots in the final result. If its length is zero, all the vertices will be considered.
-func (d *Dag[K, T]) TopologicalBatch(reverse bool, names ...K) ([][]T, error) {
+//
+// Normal Params:
+//   - names (type:K),  names specify the roots in the final result. If its length is zero, all the vertices will be considered.
+//
+// Config Params:
+//   - reverse (type:Flag): by default, the roots are in the first batch and then sub-vertices of the first batch in the second batch in sequential order. If this parameter is true, the non-dependent vertices will be in the first batch and the order is opposite to the default.
+//   - already_done (type:AlreadyDone[K]): by default, all the dependencies will be considered. Sometimes, you get some tasks finished and don't wanna they influence the order, you can pass them with this field.
+func (d *Dag[K, T]) TopologicalBatch(params ...any) ([][]T, error) {
 	if !d.disableMutex {
 		d.mu.Lock()
 		defer d.mu.Unlock()
 	}
 
-	return d.topologicalBatch(reverse, names...)
+	return d.topologicalBatch(params...)
 }
 
-func (d *Dag[K, T]) topologicalBatch(reverse bool, names ...K) ([][]T, error) {
+func (d *Dag[K, T]) topologicalBatch(params ...any) ([][]T, error) {
+	var names []K
+	reverse := false
+	var alreadyDone map[K]struct{}
+	for _, param := range params {
+		if v, ok := param.(Flag); ok && v == Reverse {
+			reverse = true
+		} else if v, ok := param.(K); ok {
+			names = append(names, v)
+		} else if v, ok := param.(AlreadyDone[K]); ok {
+			alreadyDone = map[K]struct{}{}
+			for _, k := range v {
+				alreadyDone[k] = struct{}{}
+			}
+		}
+	}
+
 	if !d.readChecked() {
 		return nil, errors.New("the graph is not checked for acyclicity, please call CheckCycle first")
 	}
@@ -448,10 +473,10 @@ func (d *Dag[K, T]) topologicalBatch(reverse bool, names ...K) ([][]T, error) {
 			names = append(names, vertex.name)
 		}
 	}
-	return d.topologicalBatchForSpecified(reverse, names...)
+	return d.topologicalBatchForSpecified(reverse, alreadyDone, names...)
 }
 
-func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, names ...K) ([][]T, error) {
+func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, alreadyDone map[K]struct{}, names ...K) ([][]T, error) {
 	deps := make(map[K]map[K]struct{}, len(names))
 
 	// this will boost the speed than lock in every loop
@@ -465,11 +490,15 @@ func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, names ...K) ([][]
 
 	needUpdateCache := false
 	for _, name := range names {
-		if _, exist := deps[name]; exist {
-			continue
+		if len(alreadyDone) != 0 {
+			deps[name] = d.collectDependentKeys(name, alreadyDone)
+		} else {
+			if _, exist := deps[name]; exist {
+				continue
+			}
+			needUpdateCache = true
+			deps[name] = d.collectDependentKeys(name, nil)
 		}
-		needUpdateCache = true
-		deps[name] = d.collectDependentKeys(name)
 	}
 	if needUpdateCache {
 		func() {
@@ -488,12 +517,12 @@ func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, names ...K) ([][]
 	}
 }
 
-func (d *Dag[K, T]) collectDependentKeys(name K) map[K]struct{} {
+func (d *Dag[K, T]) collectDependentKeys(name K, alreadyDone map[K]struct{}) map[K]struct{} {
 	result := make(map[K]struct{})
 	vertex := d.vertices[name]
 	result[name] = struct{}{}
 	for k := range vertex.outgoing {
-		d.dfsCollectDependentKeys(result, k)
+		d.dfsCollectDependentKeys(result, k, alreadyDone)
 	}
 	return result
 }
@@ -558,11 +587,14 @@ func (d *Dag[K, T]) calculateTopologicalBatchReversely(deps map[K]map[K]struct{}
 	return batches
 }
 
-func (d *Dag[K, T]) dfsCollectDependentKeys(result map[K]struct{}, name K) {
+func (d *Dag[K, T]) dfsCollectDependentKeys(result map[K]struct{}, name K, alreadyDone map[K]struct{}) {
+	if _, exist := alreadyDone[name]; exist {
+		return
+	}
 	result[name] = struct{}{}
 	vertex := d.vertices[name]
 	for k := range vertex.outgoing {
-		d.dfsCollectDependentKeys(result, k)
+		d.dfsCollectDependentKeys(result, k, alreadyDone)
 	}
 }
 
