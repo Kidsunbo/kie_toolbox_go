@@ -110,7 +110,7 @@ func (d *Dag[K, T]) AddVertex(name K, value T) error {
 
 func (d *Dag[K, T]) addVertex(name K, value T) error {
 	if _, exist := d.vertices[name]; exist {
-		return fmt.Errorf("failed to add vertex, vertex %v already exist", name)
+		return fmt.Errorf("failed to add vertex, vertex %v has already existed", name)
 	}
 	d.setChecked(false)
 	d.vertices[name] = newVertex(name, value)
