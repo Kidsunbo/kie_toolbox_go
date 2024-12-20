@@ -79,6 +79,38 @@ func TestGetAllVertex(t *testing.T) {
 
 }
 
+func TestGetAllEdges(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	assert.NoError(t, dag.AddVertex(1, 1))
+	assert.NoError(t, dag.AddVertex(2, 2))
+	assert.NoError(t, dag.AddVertex(3, 3))
+	assert.NoError(t, dag.AddVertex(4, 4))
+	assert.NoError(t, dag.AddVertex(5, 5))
+
+	assert.NoError(t, dag.AddEdge(1, 5))
+	assert.NoError(t, dag.AddEdge(1, 2))
+	assert.NoError(t, dag.AddEdge(1, 3))
+	assert.NoError(t, dag.AddEdge(2, 3))
+	assert.NoError(t, dag.AddEdge(3, 5))
+	dag.CheckCycle()
+
+
+	edges := dag.GetAllEdges()
+	assert.Equal(t, 3, len(edges))
+	assert.ElementsMatch(t, edges[1], []int{2,3,5})
+	assert.ElementsMatch(t, edges[2], []int{3})
+	assert.ElementsMatch(t, edges[3], []int{5})
+
+
+	dag.RemoveEdge(3,5)
+	edges = dag.GetAllEdges()
+	assert.Equal(t, 2, len(edges))
+	assert.ElementsMatch(t, edges[1], []int{2,3,5})
+	assert.ElementsMatch(t, edges[2], []int{3})
+
+}
+
+
 func TestHasVertex(t *testing.T) {
 	dag := NewDag[int, int]("debug")
 	assert.NoError(t, dag.AddVertex(1, 1))
