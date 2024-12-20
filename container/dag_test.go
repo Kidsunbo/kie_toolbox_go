@@ -28,7 +28,7 @@ func TestAddVertex(t *testing.T) {
 	assert.NoError(t, dag.AddVertex(7, 7))
 	assert.NoError(t, dag.AddVertex(8, 8))
 
-	assert.EqualError(t, dag.AddVertex(3, 3), "failed to add vertex, vertex 3 already exist")
+	assert.EqualError(t, dag.AddVertex(3, 3), "failed to add vertex, vertex 3 has already existed")
 
 	assert.Equal(t, 0, len(dag.cachedFullTopo))
 	assert.Equal(t, "debug", dag.name)
