@@ -617,7 +617,6 @@ func TestTopologicalBatchReverselyWithAlreadyDone(t *testing.T) {
 	assert.Equal(t, len(tb), 1)
 	assert.ElementsMatch(t, tb[0], []int{1, 5})
 
-
 	dag = NewDag[int, int]("debug")
 	assert.NoError(t, dag.AddVertex(1, 1))
 	assert.NoError(t, dag.AddVertex(2, 2))
@@ -670,6 +669,31 @@ func TestCopy(t *testing.T) {
 	dagCp := dag.Copy()
 	assert.Equal(t, "debug_copy", dagCp.name)
 	assert.NotSame(t, dag.vertices, dagCp.vertices)
+}
+
+func TestString(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	assert.NoError(t, dag.AddVertex(1, 1))
+	assert.NoError(t, dag.AddVertex(2, 2))
+	assert.NoError(t, dag.AddVertex(3, 3))
+	assert.NoError(t, dag.AddVertex(4, 4))
+	assert.NoError(t, dag.AddVertex(5, 5))
+	assert.NoError(t, dag.AddVertex(6, 6))
+	assert.NoError(t, dag.AddVertex(7, 7))
+	assert.NoError(t, dag.AddVertex(8, 8))
+	assert.NoError(t, dag.AddEdge(1, 2))
+	assert.NoError(t, dag.AddEdge(2, 3))
+	assert.NoError(t, dag.AddEdge(3, 4))
+	assert.NoError(t, dag.AddEdge(5, 4))
+	assert.NoError(t, dag.AddEdge(5, 6))
+	assert.NoError(t, dag.AddEdge(6, 7))
+	assert.NoError(t, dag.AddEdge(7, 8))
+
+	assert.Equal(t, dag.String(), "name: debug, message: not checked")
+
+	dag.CheckCycle()
+
+	fmt.Println(dag.String())
 }
 
 func TestRaceAdd(t *testing.T) {
