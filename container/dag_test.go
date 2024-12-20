@@ -716,7 +716,7 @@ func TestDot(t *testing.T) {
 	assert.NoError(t, dag.AddEdge(6, 7))
 	assert.NoError(t, dag.AddEdge(7, 8))
 
-	assert.Equal(t, dag.String(), "name: debug, message: not checked")
+	assert.Equal(t, dag.Dot(), "name: debug, message: not checked")
 
 	dag.CheckCycle()
 
