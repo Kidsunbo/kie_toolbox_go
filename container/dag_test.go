@@ -666,9 +666,15 @@ func TestCopy(t *testing.T) {
 	dag.AddEdge(1, 2)
 	dag.AddEdge(2, 4)
 	dag.AddEdge(3, 4)
-	dagCp := dag.Copy()
+	dagCp := dag.Copy(nil)
 	assert.Equal(t, "debug_copy", dagCp.name)
 	assert.NotSame(t, dag.vertices, dagCp.vertices)
+	assert.Equal(t, 1, dag.vertices[1].value)
+
+	dagCp = dag.Copy(func(i int) int { return i + 1 })
+	assert.Equal(t, "debug_copy", dagCp.name)
+	assert.NotSame(t, dag.vertices, dagCp.vertices)
+	assert.Equal(t, 2, dagCp.vertices[1].value)
 }
 
 func TestString(t *testing.T) {
