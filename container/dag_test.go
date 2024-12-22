@@ -812,12 +812,29 @@ func TestCanReach(t *testing.T) {
 	assert.NoError(t, dag.AddEdge(6, 4))
 
 	yes, err := dag.CanReach(1, 2)
-	assert.Error(t, err, "未检查图中是否包含环，请调用CheckCycle进行检查")
+	assert.EqualError(t, err, "未检查图中是否包含环，请调用CheckCycle进行检查")
+	assert.False(t, yes)
+
+	yes, err = dag.CanReach(10, 2)
+	assert.EqualError(t, err, "没有名字叫10的节点")
+	assert.False(t, yes)
+
+	yes, err = dag.CanReach(1, 20)
+	assert.EqualError(t, err, "没有名字叫20的节点")
 	assert.False(t, yes)
 
 	yes, cycles := dag.CheckCycle()
 	assert.Equal(t, 0, len(cycles))
 	assert.True(t, yes)
+
+	yes, err = dag.CanReach(10, 2)
+	assert.EqualError(t, err, "没有名字叫10的节点")
+	assert.False(t, yes)
+
+	yes, err = dag.CanReach(1, 20)
+	assert.EqualError(t, err, "没有名字叫20的节点")
+	assert.False(t, yes)
+
 
 	yes, err = dag.CanReach(1, 2)
 	assert.Nil(t, err)

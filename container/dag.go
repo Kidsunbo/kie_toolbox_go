@@ -692,12 +692,12 @@ func (d *Dag[K, T]) CanReach(from, to K) (bool, error) {
 func (d *Dag[K, T]) canReach(from, to K) (bool, error) {
 	_, exist := d.vertices[from]
 	if !exist {
-		return false, fmt.Errorf(d.message(removeVertexError), from)
+		return false, fmt.Errorf(d.message(noVertexError), from)
 	}
 
 	_, exist = d.vertices[to]
 	if !exist {
-		return false, fmt.Errorf(d.message(removeVertexError), to)
+		return false, fmt.Errorf(d.message(noVertexError), to)
 	}
 
 	if !d.readChecked() {
