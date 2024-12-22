@@ -438,6 +438,17 @@ func TestTopologicalBatchSequentially(t *testing.T) {
 	assert.ElementsMatch(t, tb[5], []int{6})
 	assert.ElementsMatch(t, tb[6], []int{7, 8})
 
+	tb, err = dag.TopologicalBatch([]int64{1, 2})
+	assert.NoError(t, err)
+	assert.Equal(t, 7, len(tb))
+	assert.ElementsMatch(t, tb[0], []int{9, 10})
+	assert.ElementsMatch(t, tb[1], []int{1})
+	assert.ElementsMatch(t, tb[2], []int{2, 3})
+	assert.ElementsMatch(t, tb[3], []int{4})
+	assert.ElementsMatch(t, tb[4], []int{5})
+	assert.ElementsMatch(t, tb[5], []int{6})
+	assert.ElementsMatch(t, tb[6], []int{7, 8})
+
 	assert.NoError(t, dag.RemoveEdge(1, 2))
 	assert.NoError(t, dag.RemoveEdge(6, 8))
 	dag.CheckCycle()
@@ -450,6 +461,17 @@ func TestTopologicalBatchSequentially(t *testing.T) {
 	assert.ElementsMatch(t, tb[3], []int{5})
 	assert.ElementsMatch(t, tb[4], []int{6})
 	assert.ElementsMatch(t, tb[5], []int{7})
+
+	tb, err = dag.TopologicalBatch([]int{1, 2})
+	assert.NoError(t, err)
+	assert.Equal(t, 6, len(tb))
+	assert.ElementsMatch(t, tb[0], []int{1, 2})
+	assert.ElementsMatch(t, tb[1], []int{3, 8})
+	assert.ElementsMatch(t, tb[2], []int{4})
+	assert.ElementsMatch(t, tb[3], []int{5})
+	assert.ElementsMatch(t, tb[4], []int{6})
+	assert.ElementsMatch(t, tb[5], []int{7})
+
 }
 
 func TestTopologicalBatchReversely(t *testing.T) {
@@ -504,6 +526,11 @@ func TestTopologicalBatchReversely(t *testing.T) {
 	assert.Equal(t, 1, len(tb))
 	assert.ElementsMatch(t, tb[0], []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
+	tb, err = dag.TopologicalBatch(Reverse, []int32{1,2})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(tb))
+	assert.ElementsMatch(t, tb[0], []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+
 	assert.NoError(t, dag.AddEdge(1, 3))
 	assert.NoError(t, dag.AddEdge(3, 4))
 	assert.NoError(t, dag.AddEdge(4, 5))
@@ -533,6 +560,16 @@ func TestTopologicalBatchReversely(t *testing.T) {
 	assert.NoError(t, dag.RemoveEdge(6, 8))
 	dag.CheckCycle()
 	tb, err = dag.TopologicalBatch(Reverse, 1, 2)
+	assert.NoError(t, err)
+	assert.Equal(t, 6, len(tb))
+	assert.ElementsMatch(t, tb[0], []int{7, 8})
+	assert.ElementsMatch(t, tb[1], []int{6})
+	assert.ElementsMatch(t, tb[2], []int{5})
+	assert.ElementsMatch(t, tb[3], []int{2, 4})
+	assert.ElementsMatch(t, tb[4], []int{3})
+	assert.ElementsMatch(t, tb[5], []int{1})
+
+	tb, err = dag.TopologicalBatch(Reverse, []int{1, 2})
 	assert.NoError(t, err)
 	assert.Equal(t, 6, len(tb))
 	assert.ElementsMatch(t, tb[0], []int{7, 8})
@@ -834,7 +871,6 @@ func TestCanReach(t *testing.T) {
 	yes, err = dag.CanReach(1, 20)
 	assert.EqualError(t, err, "没有名字叫20的节点")
 	assert.False(t, yes)
-
 
 	yes, err = dag.CanReach(1, 2)
 	assert.Nil(t, err)

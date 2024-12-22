@@ -536,6 +536,8 @@ func (d *Dag[K, T]) topologicalBatch(params ...any) ([][]T, error) {
 			for _, k := range v {
 				alreadyDone[k] = struct{}{}
 			}
+		} else if v, ok := param.([]K); ok {
+			names = append(names, v...)
 		}
 	}
 
