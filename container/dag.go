@@ -1,11 +1,11 @@
 /*
 For thread-safe:
-	This library can support thread-safe, while you can also get a good performance if you disable the thread-safe feature while limit your way to use it. Passing ConfigDisableThreadSafe(true) to NewDag
+	This library can support thread-safe, while you can also get a good performance if you disable the thread-safe feature while limit your way to use it. Passing DisableThreadSafe to NewDag
 	will disable the thread-safe and you will gain almost 2 to 3 times improvement in performance. But be aware that if you disable the thread-safe feature, you can never modify the vertex and
-	edge in pararrel.
+	edge in pararrel, which means that you should never call AddVertex, RemoveVertex, AddEdge and RemoveEdge at in parallel.
 
 
-For alignment:
+For order:
 	This library assumes that A is the root and the other vertices are the dependencies. By default, the E and F will be in the batch 3 and C will be in the batch 2.
 	Sometimes, if you would like the vertex be executed eagerly, you could specify the order in reverse. As a result, the first batch will be E, F and C, then B and D with A in the last batch.
 
@@ -47,6 +47,52 @@ type AlreadyDone[T any] []T
 
 var DisableThreadSafe = Flag{id: 1}
 var Reverse = Flag{id: 2}
+var EnglishError = Flag{id: 3}
+var ChineseError = Flag{id: 4}
+
+const (
+	chinese int8 = iota
+	english
+)
+
+type textIndexType int32
+
+const (
+	addVertexError textIndexType = iota
+	removeVertexError
+	addEdgeSameFromAndToError
+	addEdgeFromNotExistError
+	addEdgeToNotExistError
+	removeEdgeSameFromAndToError
+	removeEdgeFromNotExistError
+	removeEdgeToNotExistError
+	notCheckAcyclicityError
+	noVertexError
+	notCheckAcyclicityString
+	dagHasErrorString
+	dagNoErrorString
+)
+
+type languagePack struct {
+	Chinese string
+	English string
+}
+
+var msg = map[textIndexType]languagePack{
+	addVertexError:               {Chinese: "添加节点失败，节点%v已经存在", English: "failed to add vertex, vertex %v has already existed"},
+	removeVertexError:            {Chinese: "移除节点失败，节点%v不存在", English: "failed to remove vertex, vertex %v doesn't exist"},
+	addEdgeSameFromAndToError:    {Chinese: "添加边失败，边的起点和终点不能一样", English: "failed to add edge, the from and to can not be the same"},
+	addEdgeFromNotExistError:     {Chinese: "添加边失败，边的起点%v不存在", English: "failed to add edge, the from vertex %v doesn't exist"},
+	addEdgeToNotExistError:       {Chinese: "添加边失败，边的终点%v不存在", English: "failed to add edge, the to vertex %v doesn't exist"},
+	removeEdgeSameFromAndToError: {Chinese: "移除边失败，边的起点和终点不能一样", English: "failed to remove edge, the from and to can not be the same"},
+	removeEdgeFromNotExistError:  {Chinese: "移除边失败，边的起点%v不存在", English: "failed to remove edge, the from vertex %v doesn't exist"},
+	removeEdgeToNotExistError:    {Chinese: "移除边失败，边的终点%v不存在", English: "failed to remove edge, the to vertex %v doesn't exist"},
+	notCheckAcyclicityError:      {Chinese: "未检查图中是否包含环，请调用CheckCycle进行检查", English: "the graph is not checked for acyclicity, please call CheckCycle first"},
+	noVertexError:                {Chinese: "没有名字叫%v的节点", English: "there is no vertex named %v"},
+	notCheckAcyclicityString:     {Chinese: "名称：%v，信息：未检查是否存在环", English: "name: %v, message: acyclicity not checked"},
+	dagHasErrorString:            {Chinese: "名称：%v，错误：%v", English: "name: %v, err: %v"},
+	dagNoErrorString:             {Chinese: "名称：%v，%v", English: "name: %v, %v"},
+}
 
 type vertex[K comparable, T any] struct {
 	name     K
@@ -73,20 +119,28 @@ type Dag[K comparable, T any] struct {
 	disableMutex bool
 	name         string
 	vertices     map[K]*vertex[K, T]
+	language     int8
 
 	checked          atomic.Bool
 	cacheLock        sync.RWMutex
 	cachedFullTopo   [][]T
-	cachedVertexTopo map[K]map[K]struct{} // key: vertex name, value: map[K]struct{} (key: the dependency, value: the dependent keys)
+	cachedVertexTopo map[K]map[K]struct{} // key: vertex name, value: all the dependence name, including the indirect ones.
 }
 
 // NewDag create a directed acycle graph with each vertex whose key is of type K and the value is of type T.
 // Normally, the name is of a string which keep unique in the whole graph. The value can be different.
 func NewDag[K comparable, T any](name string, params ...any) *Dag[K, T] {
 	disableMutex := false
+	language := chinese
 	for _, param := range params {
-		if v, ok := param.(Flag); ok && v == DisableThreadSafe {
-			disableMutex = true
+		if v, ok := param.(Flag); ok {
+			if v == DisableThreadSafe {
+				disableMutex = true
+			} else if v == ChineseError {
+				language = chinese
+			} else if v == EnglishError {
+				language = english
+			}
 		}
 	}
 
@@ -95,6 +149,7 @@ func NewDag[K comparable, T any](name string, params ...any) *Dag[K, T] {
 		disableMutex: disableMutex,
 		name:         name,
 		vertices:     map[K]*vertex[K, T]{},
+		language:     language,
 	}
 }
 
@@ -110,7 +165,7 @@ func (d *Dag[K, T]) AddVertex(name K, value T) error {
 
 func (d *Dag[K, T]) addVertex(name K, value T) error {
 	if _, exist := d.vertices[name]; exist {
-		return fmt.Errorf("failed to add vertex, vertex %v has already existed", name)
+		return fmt.Errorf(d.message(addVertexError), name)
 	}
 	d.setChecked(false)
 	d.vertices[name] = newVertex(name, value)
@@ -134,6 +189,7 @@ func (d *Dag[K, T]) getAllVertices() []T {
 	return result
 }
 
+// GetAllEdges gets all the edges in the graph
 func (d *Dag[K, T]) GetAllEdges() map[K][]K {
 	if !d.disableMutex {
 		d.mu.Lock()
@@ -171,7 +227,7 @@ func (d *Dag[K, T]) RemoveVertex(name K) error {
 func (d *Dag[K, T]) removeVertex(name K) error {
 	cur, exist := d.vertices[name]
 	if !exist {
-		return fmt.Errorf("failed to remove vertex, vertex %v doesn't exist", name)
+		return fmt.Errorf(d.message(removeVertexError), name)
 	}
 
 	for _, vertex := range cur.incoming {
@@ -214,17 +270,17 @@ func (d *Dag[K, T]) AddEdge(from, to K) error {
 
 func (d *Dag[K, T]) addEdge(from, to K) error {
 	if from == to {
-		return fmt.Errorf("failed to add edge, the from and to can not be the same")
+		return errors.New(d.message(addEdgeSameFromAndToError))
 	}
 
 	fromVertex, exist := d.vertices[from]
 	if !exist {
-		return fmt.Errorf("failed to add edge, the from vertex %v doesn't exist", from)
+		return fmt.Errorf(d.message(addEdgeFromNotExistError), from)
 	}
 
 	toVertex, exist := d.vertices[to]
 	if !exist {
-		return fmt.Errorf("failed to add edge, the to vertex %v doesn't exist", to)
+		return fmt.Errorf(d.message(addEdgeToNotExistError), to)
 	}
 
 	d.setChecked(false)
@@ -247,17 +303,17 @@ func (d *Dag[K, T]) RemoveEdge(from, to K) error {
 
 func (d *Dag[K, T]) removeEdge(from, to K) error {
 	if from == to {
-		return fmt.Errorf("failed to remove edge, the from and to can not be the same")
+		return errors.New(d.message(removeEdgeSameFromAndToError))
 	}
 
 	fromVertex, exist := d.vertices[from]
 	if !exist {
-		return fmt.Errorf("failed to remove edge, the from vertex %v doesn't exist", from)
+		return fmt.Errorf(d.message(removeEdgeFromNotExistError), from)
 	}
 
 	toVertex, exist := d.vertices[to]
 	if !exist {
-		return fmt.Errorf("failed to remove edge, the to vertex %v doesn't exist", to)
+		return fmt.Errorf(d.message(removeEdgeToNotExistError), to)
 	}
 
 	d.setChecked(false)
@@ -372,7 +428,7 @@ func (d *Dag[K, T]) TopologicalSort() ([]T, error) {
 
 func (d *Dag[K, T]) topologicalSort() ([]T, error) {
 	if !d.readChecked() {
-		return nil, errors.New("the graph is not checked for acyclicity, please call CheckCycle first")
+		return nil, errors.New(d.message(notCheckAcyclicityError))
 	}
 
 	d.cacheLock.RLock()
@@ -484,12 +540,12 @@ func (d *Dag[K, T]) topologicalBatch(params ...any) ([][]T, error) {
 	}
 
 	if !d.readChecked() {
-		return nil, errors.New("the graph is not checked for acyclicity, please call CheckCycle first")
+		return nil, errors.New(d.message(notCheckAcyclicityError))
 	}
 
 	for _, name := range names {
 		if _, exist := d.vertices[name]; !exist {
-			return nil, fmt.Errorf("there is no vertex named %v", name)
+			return nil, fmt.Errorf(d.message(noVertexError), name)
 		}
 	}
 
@@ -507,7 +563,7 @@ func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, alreadyDone map[K
 	// this will boost the speed than lock in every loop
 	d.cacheLock.RLock()
 	for _, name := range names {
-		if value, ok := d.cachedVertexTopo[name]; ok {
+		if value, exist := d.cachedVertexTopo[name]; exist {
 			deps[name] = value
 		}
 	}
@@ -529,8 +585,8 @@ func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, alreadyDone map[K
 		func() {
 			d.cacheLock.Lock()
 			defer d.cacheLock.Unlock()
-			for name, path := range deps {
-				d.cachedVertexTopo[name] = path
+			for name, dep := range deps {
+				d.cachedVertexTopo[name] = dep
 			}
 		}()
 	}
@@ -623,6 +679,53 @@ func (d *Dag[K, T]) dfsCollectDependentKeys(result map[K]struct{}, name K, alrea
 	}
 }
 
+// CanReach checks if one vertex can reach to another.
+func (d *Dag[K, T]) CanReach(from, to K) (bool, error) {
+	if !d.disableMutex {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+	}
+
+	return d.canReach(from, to)
+}
+
+func (d *Dag[K, T]) canReach(from, to K) (bool, error) {
+	_, exist := d.vertices[from]
+	if !exist {
+		return false, fmt.Errorf(d.message(removeVertexError), from)
+	}
+
+	_, exist = d.vertices[to]
+	if !exist {
+		return false, fmt.Errorf(d.message(removeVertexError), to)
+	}
+
+	if !d.readChecked() {
+		return false, errors.New(d.message(notCheckAcyclicityError))
+	}
+
+	cached, exist := func() (bool, bool) {
+		d.cacheLock.RLock()
+		defer d.cacheLock.RUnlock()
+		keys, cached := d.cachedVertexTopo[from]
+		if !cached {
+			return cached, false
+		}
+		_, exist := keys[to]
+		return cached, exist
+	}()
+
+	if !cached {
+		d.cacheLock.Lock()
+		dep := d.collectDependentKeys(from, nil)
+		d.cachedVertexTopo[from] = dep
+		_, exist = dep[to]
+		d.cacheLock.Unlock()
+	}
+
+	return exist, nil
+}
+
 // String returns the string of dag, that can be useful for debug and logging.
 func (d *Dag[K, T]) String() string {
 	if !d.disableMutex {
@@ -631,14 +734,14 @@ func (d *Dag[K, T]) String() string {
 	}
 
 	if !d.readChecked() {
-		return fmt.Sprintf("name: %v, message: not checked", d.name)
+		return fmt.Sprintf(d.message(notCheckAcyclicityString), d.name)
 	}
 
 	output, err := d.topologicalSort()
 	if err != nil {
-		return fmt.Sprintf("name: %v, err: %v", d.name, err)
+		return fmt.Sprintf(d.message(dagHasErrorString), d.name, err)
 	}
-	return fmt.Sprintf("name: %v, %v", d.name, output)
+	return fmt.Sprintf(d.message(dagNoErrorString), d.name, output)
 }
 
 func (d *Dag[K, T]) Dot() string {
@@ -648,7 +751,7 @@ func (d *Dag[K, T]) Dot() string {
 	}
 
 	if !d.readChecked() {
-		return fmt.Sprintf("name: %v, message: not checked", d.name)
+		return fmt.Sprintf(d.message(notCheckAcyclicityString), d.name)
 	}
 
 	sb := strings.Builder{}
@@ -697,6 +800,17 @@ func (d *Dag[K, T]) Copy(valueCopyFunction func(T) T) *Dag[K, T] {
 	cpDag.disableMutex = d.disableMutex
 
 	return cpDag
+}
+
+func (d *Dag[K, T]) message(textIndex textIndexType) string {
+	switch d.language {
+	case chinese:
+		return msg[textIndex].Chinese
+	case english:
+		return msg[textIndex].English
+	default:
+		return "error: unknown language"
+	}
 }
 
 func (d *Dag[K, T]) readChecked() bool {

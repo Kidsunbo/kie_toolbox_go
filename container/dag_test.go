@@ -18,7 +18,7 @@ func mapToSlice[K comparable, T any](m map[K]T) []K {
 }
 
 func TestAddVertex(t *testing.T) {
-	dag := NewDag[int, int]("debug")
+	dag := NewDag[int, int]("debug", EnglishError)
 	assert.NoError(t, dag.AddVertex(1, 1))
 	assert.NoError(t, dag.AddVertex(2, 2))
 	assert.NoError(t, dag.AddVertex(3, 3))
@@ -36,8 +36,30 @@ func TestAddVertex(t *testing.T) {
 	assert.False(t, dag.checked.Load())
 }
 
-func TestRemoveVertex(t *testing.T) {
+func TestAddVertexDefaultError(t *testing.T) {
 	dag := NewDag[int, int]("debug")
+	assert.NoError(t, dag.AddVertex(1, 1))
+	assert.NoError(t, dag.AddVertex(2, 2))
+
+	assert.EqualError(t, dag.AddVertex(1, 1), "添加节点失败，节点1已经存在")
+	assert.EqualError(t, dag.AddVertex(1, 2), "添加节点失败，节点1已经存在")
+	assert.EqualError(t, dag.AddVertex(2, 2), "添加节点失败，节点2已经存在")
+	assert.EqualError(t, dag.AddVertex(2, 3), "添加节点失败，节点2已经存在")
+}
+
+func TestAddVertexChineseError(t *testing.T) {
+	dag := NewDag[int, int]("debug", ChineseError)
+	assert.NoError(t, dag.AddVertex(1, 1))
+	assert.NoError(t, dag.AddVertex(2, 2))
+
+	assert.EqualError(t, dag.AddVertex(1, 1), "添加节点失败，节点1已经存在")
+	assert.EqualError(t, dag.AddVertex(1, 2), "添加节点失败，节点1已经存在")
+	assert.EqualError(t, dag.AddVertex(2, 2), "添加节点失败，节点2已经存在")
+	assert.EqualError(t, dag.AddVertex(2, 3), "添加节点失败，节点2已经存在")
+}
+
+func TestRemoveVertex(t *testing.T) {
+	dag := NewDag[int, int]("debug", EnglishError)
 	assert.NoError(t, dag.AddVertex(1, 1))
 	assert.NoError(t, dag.AddVertex(2, 2))
 	assert.NoError(t, dag.AddVertex(3, 3))
@@ -59,6 +81,20 @@ func TestRemoveVertex(t *testing.T) {
 	assert.Equal(t, "debug", dag.name)
 	assert.Equal(t, 7, len(dag.vertices))
 	assert.False(t, dag.checked.Load())
+}
+
+func TestRemoveVertexDefaultError(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+
+	assert.EqualError(t, dag.RemoveVertex(1), "移除节点失败，节点1不存在")
+	assert.EqualError(t, dag.RemoveVertex(2), "移除节点失败，节点2不存在")
+}
+
+func TestRemoveVertexChineseError(t *testing.T) {
+	dag := NewDag[int, int]("debug", ChineseError)
+
+	assert.EqualError(t, dag.RemoveVertex(1), "移除节点失败，节点1不存在")
+	assert.EqualError(t, dag.RemoveVertex(2), "移除节点失败，节点2不存在")
 }
 
 func TestGetAllVertex(t *testing.T) {
@@ -94,22 +130,19 @@ func TestGetAllEdges(t *testing.T) {
 	assert.NoError(t, dag.AddEdge(3, 5))
 	dag.CheckCycle()
 
-
 	edges := dag.GetAllEdges()
 	assert.Equal(t, 3, len(edges))
-	assert.ElementsMatch(t, edges[1], []int{2,3,5})
+	assert.ElementsMatch(t, edges[1], []int{2, 3, 5})
 	assert.ElementsMatch(t, edges[2], []int{3})
 	assert.ElementsMatch(t, edges[3], []int{5})
 
-
-	dag.RemoveEdge(3,5)
+	dag.RemoveEdge(3, 5)
 	edges = dag.GetAllEdges()
 	assert.Equal(t, 2, len(edges))
-	assert.ElementsMatch(t, edges[1], []int{2,3,5})
+	assert.ElementsMatch(t, edges[1], []int{2, 3, 5})
 	assert.ElementsMatch(t, edges[2], []int{3})
 
 }
-
 
 func TestHasVertex(t *testing.T) {
 	dag := NewDag[int, int]("debug")
@@ -130,7 +163,7 @@ func TestHasVertex(t *testing.T) {
 }
 
 func TestAddEdge(t *testing.T) {
-	dag := NewDag[int, int]("debug")
+	dag := NewDag[int, int]("debug", EnglishError)
 	assert.NoError(t, dag.AddVertex(1, 1))
 	assert.NoError(t, dag.AddVertex(2, 2))
 	assert.NoError(t, dag.AddVertex(3, 3))
@@ -183,7 +216,7 @@ func TestAddEdge(t *testing.T) {
 }
 
 func TestRemoveEdge(t *testing.T) {
-	dag := NewDag[int, int]("debug")
+	dag := NewDag[int, int]("debug", EnglishError)
 	assert.NoError(t, dag.AddVertex(1, 1))
 	assert.NoError(t, dag.AddVertex(2, 2))
 	assert.NoError(t, dag.AddVertex(3, 3))
@@ -710,7 +743,7 @@ func TestCopy(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	dag := NewDag[int, int]("debug")
+	dag := NewDag[int, int]("debug", EnglishError)
 	assert.NoError(t, dag.AddVertex(1, 1))
 	assert.NoError(t, dag.AddVertex(2, 2))
 	assert.NoError(t, dag.AddVertex(3, 3))
@@ -727,7 +760,7 @@ func TestString(t *testing.T) {
 	assert.NoError(t, dag.AddEdge(6, 7))
 	assert.NoError(t, dag.AddEdge(7, 8))
 
-	assert.Equal(t, dag.String(), "name: debug, message: not checked")
+	assert.Equal(t, dag.String(), "name: debug, message: acyclicity not checked")
 
 	dag.CheckCycle()
 
@@ -737,7 +770,7 @@ func TestString(t *testing.T) {
 }
 
 func TestDot(t *testing.T) {
-	dag := NewDag[int, int]("debug")
+	dag := NewDag[int, int]("debug", EnglishError)
 	assert.NoError(t, dag.AddVertex(1, 1))
 	assert.NoError(t, dag.AddVertex(2, 2))
 	assert.NoError(t, dag.AddVertex(3, 3))
@@ -754,13 +787,73 @@ func TestDot(t *testing.T) {
 	assert.NoError(t, dag.AddEdge(6, 7))
 	assert.NoError(t, dag.AddEdge(7, 8))
 
-	assert.Equal(t, dag.Dot(), "name: debug, message: not checked")
+	assert.Equal(t, dag.Dot(), "name: debug, message: acyclicity not checked")
 
 	dag.CheckCycle()
 
 	assert.NotPanics(t, func() {
 		_ = dag.Dot()
 	})
+}
+
+func TestCanReach(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	assert.NoError(t, dag.AddVertex(1, 1))
+	assert.NoError(t, dag.AddVertex(2, 2))
+	assert.NoError(t, dag.AddVertex(3, 3))
+	assert.NoError(t, dag.AddVertex(4, 4))
+	assert.NoError(t, dag.AddVertex(5, 5))
+	assert.NoError(t, dag.AddVertex(6, 6))
+	assert.NoError(t, dag.AddVertex(7, 7))
+	assert.NoError(t, dag.AddVertex(8, 8))
+	assert.NoError(t, dag.AddEdge(1, 2))
+	assert.NoError(t, dag.AddEdge(2, 3))
+	assert.NoError(t, dag.AddEdge(3, 4))
+	assert.NoError(t, dag.AddEdge(6, 4))
+
+	yes, err := dag.CanReach(1, 2)
+	assert.Error(t, err, "未检查图中是否包含环，请调用CheckCycle进行检查")
+	assert.False(t, yes)
+
+	yes, cycles := dag.CheckCycle()
+	assert.Equal(t, 0, len(cycles))
+	assert.True(t, yes)
+
+	yes, err = dag.CanReach(1, 2)
+	assert.Nil(t, err)
+	assert.True(t, yes)
+
+	yes, err = dag.CanReach(1, 3)
+	assert.Nil(t, err)
+	assert.True(t, yes)
+
+	yes, err = dag.CanReach(2, 4)
+	assert.Nil(t, err)
+	assert.True(t, yes)
+
+	yes, err = dag.CanReach(6, 4)
+	assert.Nil(t, err)
+	assert.True(t, yes)
+
+	yes, err = dag.CanReach(3, 6)
+	assert.Nil(t, err)
+	assert.False(t, yes)
+
+	yes, err = dag.CanReach(8, 7)
+	assert.Nil(t, err)
+	assert.False(t, yes)
+
+	yes, err = dag.CanReach(7, 8)
+	assert.Nil(t, err)
+	assert.False(t, yes)
+
+	yes, err = dag.CanReach(7, 7)
+	assert.Nil(t, err)
+	assert.True(t, yes)
+
+	yes, err = dag.CanReach(2, 2)
+	assert.Nil(t, err)
+	assert.True(t, yes)
 }
 
 func TestRaceAdd(t *testing.T) {
