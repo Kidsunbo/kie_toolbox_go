@@ -508,7 +508,7 @@ func (d *Dag[K, T]) flatten(batches [][]T) []T {
 // TopologicalBatchFrom returns the batches calculated in the graph with roots specified by names. The order is from the nearest to the farthest. So for most time, you should checkout the batches reversely.
 //
 // Normal Params:
-//   - names (type:K),  names specify the roots in the final result. If its length is zero, all the vertices will be considered.
+//   - names (type:K or []K),  names specify the roots in the final result. If its length is zero, all the vertices will be considered.
 //
 // Config Params:
 //   - reverse (type:Flag): by default, the roots are in the first batch and then sub-vertices of the first batch in the second batch in sequential order. If this parameter is true, the non-dependent vertices will be in the first batch and the order is opposite to the default.
