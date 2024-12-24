@@ -174,8 +174,8 @@ func (d *Dag[K, T]) addVertex(name K, value T) error {
 
 func (d *Dag[K, T]) GetAllVertices() []T {
 	if !d.disableMutex {
-		d.mu.Lock()
-		defer d.mu.Unlock()
+		d.mu.RLock()
+		defer d.mu.RUnlock()
 	}
 
 	return d.getAllVertices()
@@ -192,8 +192,8 @@ func (d *Dag[K, T]) getAllVertices() []T {
 // GetAllEdges gets all the edges in the graph
 func (d *Dag[K, T]) GetAllEdges() map[K][]K {
 	if !d.disableMutex {
-		d.mu.Lock()
-		defer d.mu.Unlock()
+		d.mu.RLock()
+		defer d.mu.RUnlock()
 	}
 
 	return d.getAllEdges()
@@ -419,8 +419,8 @@ func (d *Dag[K, T]) dfsCheckCycle(key K, state map[K]int, low map[K]int, stack *
 // TopologicalSort returns the topological sort of all vertices.
 func (d *Dag[K, T]) TopologicalSort() ([]T, error) {
 	if !d.disableMutex {
-		d.mu.Lock()
-		defer d.mu.Unlock()
+		d.mu.RLock()
+		defer d.mu.RUnlock()
 	}
 
 	return d.topologicalSort()
@@ -515,8 +515,8 @@ func (d *Dag[K, T]) flatten(batches [][]T) []T {
 //   - already_done (type:AlreadyDone[K]): by default, all the dependencies will be considered. Sometimes, you get some tasks finished and don't wanna they influence the order, you can pass them with this field.
 func (d *Dag[K, T]) TopologicalBatch(params ...any) ([][]T, error) {
 	if !d.disableMutex {
-		d.mu.Lock()
-		defer d.mu.Unlock()
+		d.mu.RLock()
+		defer d.mu.RUnlock()
 	}
 
 	return d.topologicalBatch(params...)
@@ -684,8 +684,8 @@ func (d *Dag[K, T]) dfsCollectDependentKeys(result map[K]struct{}, name K, alrea
 // CanReach checks if one vertex can reach to another.
 func (d *Dag[K, T]) CanReach(from, to K) (bool, error) {
 	if !d.disableMutex {
-		d.mu.Lock()
-		defer d.mu.Unlock()
+		d.mu.RLock()
+		defer d.mu.RUnlock()
 	}
 
 	return d.canReach(from, to)
@@ -731,8 +731,8 @@ func (d *Dag[K, T]) canReach(from, to K) (bool, error) {
 // String returns the string of dag, that can be useful for debug and logging.
 func (d *Dag[K, T]) String() string {
 	if !d.disableMutex {
-		d.mu.Lock()
-		defer d.mu.Unlock()
+		d.mu.RLock()
+		defer d.mu.RUnlock()
 	}
 
 	if !d.readChecked() {
@@ -748,8 +748,8 @@ func (d *Dag[K, T]) String() string {
 
 func (d *Dag[K, T]) Dot() string {
 	if !d.disableMutex {
-		d.mu.Lock()
-		defer d.mu.Unlock()
+		d.mu.RLock()
+		defer d.mu.RUnlock()
 	}
 
 	if !d.readChecked() {
@@ -774,6 +774,11 @@ func (d *Dag[K, T]) Dot() string {
 
 // Copy will copy the whole graph but the cached data.
 func (d *Dag[K, T]) Copy(valueCopyFunction func(T) T) *Dag[K, T] {
+	if !d.disableMutex {
+		d.mu.RLock()
+		defer d.mu.RUnlock()
+	}
+
 	if valueCopyFunction == nil {
 		valueCopyFunction = func(t T) T {
 			return t
