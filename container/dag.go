@@ -6,8 +6,8 @@ For thread-safe:
 
 
 For order:
-	This library assumes that A is the root and the other vertices are the dependencies. By default, the E and F will be in the batch 3 and C will be in the batch 2.
-	Sometimes, if you would like the vertex be executed eagerly, you could specify the order in reverse. As a result, the first batch will be E, F and C, then B and D with A in the last batch.
+	Normally, the flow is from left to right, which means that if you would like to finish C, you have to finish A before it. But if the Reverse flag is passed in some method,
+	the order changed, which means that A depends on C, so if you would like to finish A, you have to finish B, C, D first.
 
                    +---------+
                    |         |
@@ -49,6 +49,7 @@ var DisableThreadSafe = Flag{id: 1}
 var Reverse = Flag{id: 2}
 var EnglishError = Flag{id: 3}
 var ChineseError = Flag{id: 4}
+var OnlyOneBatch = Flag{id: 5}
 
 const (
 	chinese int8 = iota
@@ -68,6 +69,7 @@ const (
 	removeEdgeToNotExistError
 	notCheckAcyclicityError
 	noVertexError
+	noNamesWhenAlreadyDoneError
 	notCheckAcyclicityString
 	dagHasErrorString
 	dagNoErrorString
@@ -121,10 +123,11 @@ type Dag[K comparable, T any] struct {
 	vertices     map[K]*vertex[K, T]
 	language     int8
 
-	checked          atomic.Bool
-	cacheLock        sync.RWMutex
-	cachedFullTopo   [][]T
-	cachedVertexTopo map[K]map[K]struct{} // key: vertex name, value: all the dependence name, including the indirect ones.
+	checked             atomic.Bool
+	cacheLock           sync.RWMutex
+	cachedFullTopo      [][]T
+	cachedVertexTopo    map[K]map[K]struct{} // key: vertex name, value: all the dependence name, including the indirect ones.
+	cachedReverseVertex map[K]map[K]struct{} // key: vertex name, value: all the dependence name, including the indirect ones.
 }
 
 // NewDag create a directed acycle graph with each vertex whose key is of type K and the value is of type T.
@@ -322,7 +325,7 @@ func (d *Dag[K, T]) removeEdge(from, to K) error {
 	return nil
 }
 
-// IsChecked return true if the graph is checked and there is no cycle in it.
+// IsChecked returns true if the graph is checked and there is no cycle in it.
 func (d *Dag[K, T]) IsChecked() bool {
 	return d.readChecked()
 }
@@ -340,12 +343,11 @@ func (d *Dag[K, T]) CheckCycle() (bool, [][]K) {
 		return true, nil
 	}
 
-	func() {
-		d.cacheLock.Lock()
-		defer d.cacheLock.Unlock()
-		d.cachedFullTopo = nil
-		d.cachedVertexTopo = make(map[K]map[K]struct{}, len(d.vertices))
-	}()
+	d.cacheLock.Lock()
+	d.cachedFullTopo = nil
+	d.cachedVertexTopo = make(map[K]map[K]struct{}, len(d.vertices))
+	d.cachedReverseVertex = make(map[K]map[K]struct{}, len(d.vertices))
+	d.cacheLock.Unlock()
 
 	if len(d.vertices) == 0 {
 		d.setChecked(true)
@@ -505,10 +507,26 @@ func (d *Dag[K, T]) flatten(batches [][]T) []T {
 	return result
 }
 
+// NextBatch returns the batch will no more dependence in this graph with roots specified by names.
+// It's only a wrapper for TopologicalBatch with OnlyOneBatch passed in.
+// It accept the same parameters of TopologicalBatch.
+func (d *Dag[K, T]) NextBatch(params ...any) ([]T, error) {
+	if !d.disableMutex {
+		d.mu.RLock()
+		defer d.mu.RUnlock()
+	}
+	params = append(params, OnlyOneBatch)
+	batches, err := d.topologicalBatch(params...)
+	if len(batches) > 0 {
+		return batches[0], err
+	}
+	return nil, err
+}
+
 // TopologicalBatchFrom returns the batches calculated in the graph with roots specified by names. The order is from the nearest to the farthest. So for most time, you should checkout the batches reversely.
 //
 // Normal Params:
-//   - names (type:K or []K),  names specify the roots in the final result. If its length is zero, all the vertices will be considered.
+//   - target (type:K or []K),  target specify the roots in the final result. If its length is zero, all the vertices will be considered as the root.
 //
 // Config Params:
 //   - reverse (type:Flag): by default, the roots are in the first batch and then sub-vertices of the first batch in the second batch in sequential order. If this parameter is true, the non-dependent vertices will be in the first batch and the order is opposite to the default.
@@ -523,21 +541,27 @@ func (d *Dag[K, T]) TopologicalBatch(params ...any) ([][]T, error) {
 }
 
 func (d *Dag[K, T]) topologicalBatch(params ...any) ([][]T, error) {
-	var names []K
+	target := make(map[K]struct{})
 	reverse := false
-	var alreadyDone map[K]struct{}
+	alreadyDone := make(map[K]struct{})
+	onlyOneBatch := false
 	for _, param := range params {
-		if v, ok := param.(Flag); ok && v == Reverse {
-			reverse = true
+		if v, ok := param.(Flag); ok {
+			if v == Reverse {
+				reverse = true
+			} else if v == OnlyOneBatch {
+				onlyOneBatch = true
+			}
 		} else if v, ok := param.(K); ok {
-			names = append(names, v)
+			target[v] = struct{}{}
 		} else if v, ok := param.(AlreadyDone[K]); ok {
-			alreadyDone = map[K]struct{}{}
 			for _, k := range v {
 				alreadyDone[k] = struct{}{}
 			}
 		} else if v, ok := param.([]K); ok {
-			names = append(names, v...)
+			for _, k := range v {
+				target[k] = struct{}{}
+			}
 		}
 	}
 
@@ -545,81 +569,124 @@ func (d *Dag[K, T]) topologicalBatch(params ...any) ([][]T, error) {
 		return nil, errors.New(d.message(notCheckAcyclicityError))
 	}
 
-	for _, name := range names {
+	for name := range target {
 		if _, exist := d.vertices[name]; !exist {
 			return nil, fmt.Errorf(d.message(noVertexError), name)
 		}
 	}
 
-	if len(names) == 0 {
-		for _, vertex := range d.vertices {
-			names = append(names, vertex.name)
+	for name := range alreadyDone {
+		if _, exist := d.vertices[name]; !exist {
+			return nil, fmt.Errorf(d.message(noVertexError), name)
 		}
 	}
-	return d.topologicalBatchForSpecified(reverse, alreadyDone, names...)
+
+	if len(target) == 0 {
+		for _, vertex := range d.vertices {
+			target[vertex.name] = struct{}{}
+		}
+	}
+	return d.topologicalBatchForSpecified(reverse, onlyOneBatch, alreadyDone, target)
 }
 
-func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, alreadyDone map[K]struct{}, names ...K) ([][]T, error) {
+func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, onlyOneBatch bool, alreadyDone map[K]struct{}, names map[K]struct{}) ([][]T, error) {
 	deps := make(map[K]map[K]struct{}, len(names))
+	alreadyDoneDeps := make(map[K]map[K]struct{}, len(alreadyDone))
 
 	// this will boost the speed than lock in every loop
 	d.cacheLock.RLock()
-	for _, name := range names {
-		if value, exist := d.cachedVertexTopo[name]; exist {
+	cache := d.cachedVertexTopo
+	if reverse {
+		cache = d.cachedReverseVertex
+	}
+	for name := range names {
+		if value, exist := cache[name]; exist {
 			deps[name] = value
+		}
+	}
+	for name := range alreadyDone {
+		if value, exist := cache[name]; exist {
+			alreadyDoneDeps[name] = value
 		}
 	}
 	d.cacheLock.RUnlock()
 
 	needUpdateCache := false
-	for _, name := range names {
-		if len(alreadyDone) != 0 {
-			deps[name] = d.collectDependentKeys(name, alreadyDone)
-		} else {
-			if _, exist := deps[name]; exist {
-				continue
-			}
-			needUpdateCache = true
-			deps[name] = d.collectDependentKeys(name, nil)
+	for name := range names {
+		if _, exist := deps[name]; exist {
+			continue
 		}
+		needUpdateCache = true
+		deps[name] = d.collectDependentKeys(name, reverse)
+	}
+	for name := range alreadyDone {
+		if _, exist := alreadyDoneDeps[name]; exist {
+			continue
+		}
+		needUpdateCache = true
+		alreadyDoneDeps[name] = d.collectDependentKeys(name, reverse)
 	}
 	if needUpdateCache {
 		func() {
 			d.cacheLock.Lock()
 			defer d.cacheLock.Unlock()
+			cache := d.cachedVertexTopo
+			if reverse {
+				cache = d.cachedReverseVertex
+			}
 			for name, dep := range deps {
-				d.cachedVertexTopo[name] = dep
+				cache[name] = dep
+			}
+			for name, dep := range alreadyDoneDeps {
+				cache[name] = dep
 			}
 		}()
 	}
 
 	if reverse {
-		return d.calculateTopologicalBatchReversely(deps), nil
+		return d.calculateTopologicalBatchReversely(onlyOneBatch, deps, alreadyDoneDeps), nil
 	} else {
-		return d.calculateTopologicalBatchSequentially(deps), nil
+		return d.calculateTopologicalBatchSequentially(onlyOneBatch, deps, alreadyDoneDeps), nil
 	}
 }
 
-func (d *Dag[K, T]) collectDependentKeys(name K, alreadyDone map[K]struct{}) map[K]struct{} {
+func (d *Dag[K, T]) collectDependentKeys(name K, reverse bool) map[K]struct{} {
 	result := make(map[K]struct{})
 	vertex := d.vertices[name]
 	result[name] = struct{}{}
-	for k := range vertex.outgoing {
-		d.dfsCollectDependentKeys(result, k, alreadyDone)
+	if reverse {
+		for k := range vertex.outgoing {
+			d.dfsCollectDependentKeys(result, k, reverse)
+		}
+	} else {
+		for k := range vertex.incoming {
+			d.dfsCollectDependentKeys(result, k, reverse)
+		}
 	}
+
 	return result
 }
 
-func (d *Dag[K, T]) calculateTopologicalBatchSequentially(deps map[K]map[K]struct{}) [][]T {
-	vertices := make(map[K]struct{})
-	limitation := make(map[K]struct{})
+func (d *Dag[K, T]) calculateTopologicalBatchSequentially(onlyOneBatch bool, deps map[K]map[K]struct{}, alreadyDoneDeps map[K]map[K]struct{}) [][]T {
+	removed := make(map[K]struct{}, len(d.vertices))
+	for _, dep := range alreadyDoneDeps {
+		for k := range dep {
+			removed[k] = struct{}{}
+		}
+	}
+
+	vertices := make(map[K]struct{}, len(d.vertices))
+	limitation := make(map[K]struct{}, len(d.vertices))
 	for _, dep := range deps {
 		for k := range dep {
+			if _, exist := removed[k]; exist {
+				continue
+			}
 			vertices[k] = struct{}{}
 			limitation[k] = struct{}{}
 		}
 	}
-	removed := make(map[K]struct{})
+
 	batches := make([][]T, 0)
 	for len(vertices) > 0 {
 		batchKeys := make([]K, 0)
@@ -635,21 +702,34 @@ func (d *Dag[K, T]) calculateTopologicalBatchSequentially(deps map[K]map[K]struc
 			batch = append(batch, d.vertices[k].value)
 		}
 		batches = append(batches, batch)
+		if onlyOneBatch {
+			break
+		}
 	}
 
 	return batches
 }
 
-func (d *Dag[K, T]) calculateTopologicalBatchReversely(deps map[K]map[K]struct{}) [][]T {
-	vertices := make(map[K]struct{})
-	limitation := make(map[K]struct{})
+func (d *Dag[K, T]) calculateTopologicalBatchReversely(onlyOneBatch bool, deps map[K]map[K]struct{}, alreadyDoneDeps map[K]map[K]struct{}) [][]T {
+	removed := make(map[K]struct{}, len(d.vertices))
+	for _, dep := range alreadyDoneDeps {
+		for k := range dep {
+			removed[k] = struct{}{}
+		}
+	}
+
+	vertices := make(map[K]struct{}, len(d.vertices))
+	limitation := make(map[K]struct{}, len(d.vertices))
 	for _, dep := range deps {
 		for k := range dep {
+			if _, exist := removed[k]; exist {
+				continue
+			}
 			vertices[k] = struct{}{}
 			limitation[k] = struct{}{}
 		}
 	}
-	removed := make(map[K]struct{})
+
 	batches := make([][]T, 0)
 	for len(vertices) > 0 {
 		batchKeys := make([]K, 0)
@@ -665,19 +745,25 @@ func (d *Dag[K, T]) calculateTopologicalBatchReversely(deps map[K]map[K]struct{}
 			batch = append(batch, d.vertices[k].value)
 		}
 		batches = append(batches, batch)
+		if onlyOneBatch {
+			break
+		}
 	}
 
 	return batches
 }
 
-func (d *Dag[K, T]) dfsCollectDependentKeys(result map[K]struct{}, name K, alreadyDone map[K]struct{}) {
-	if _, exist := alreadyDone[name]; exist {
-		return
-	}
+func (d *Dag[K, T]) dfsCollectDependentKeys(result map[K]struct{}, name K, reverse bool) {
 	result[name] = struct{}{}
 	vertex := d.vertices[name]
-	for k := range vertex.outgoing {
-		d.dfsCollectDependentKeys(result, k, alreadyDone)
+	if reverse {
+		for k := range vertex.outgoing {
+			d.dfsCollectDependentKeys(result, k, reverse)
+		}
+	} else {
+		for k := range vertex.incoming {
+			d.dfsCollectDependentKeys(result, k, reverse)
+		}
 	}
 }
 
@@ -719,7 +805,7 @@ func (d *Dag[K, T]) canReach(from, to K) (bool, error) {
 
 	if !cached {
 		d.cacheLock.Lock()
-		dep := d.collectDependentKeys(from, nil)
+		dep := d.collectDependentKeys(from, true)
 		d.cachedVertexTopo[from] = dep
 		_, exist = dep[to]
 		d.cacheLock.Unlock()
