@@ -17,7 +17,7 @@ func mapToSlice[K comparable, T any](m map[K]T) []K {
 	return result
 }
 
-func TestAddVertex(t *testing.T) {
+func TestAddVertexEnglishError(t *testing.T) {
 	dag := NewDag[int, int]("debug", EnglishError)
 	assert.NoError(t, dag.AddVertex(1, 1))
 	assert.NoError(t, dag.AddVertex(2, 2))
@@ -391,13 +391,62 @@ func TestTopologicalBatchSequentially(t *testing.T) {
 	assert.ElementsMatch(t, tb[4], []int{8})
 	cachedData, ok := dag.cachedVertexTopo[1]
 	assert.True(t, ok)
-	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{1: {}, 3: {}, 4: {}, 6: {}, 7: {}, 8: {}}))
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{1: {}}))
+	_, ok = dag.cachedReverseVertex[1]
+	assert.False(t, ok)
 	cachedData, ok = dag.cachedVertexTopo[8]
 	assert.True(t, ok)
-	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{8: {}}))
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{8: {}, 7: {}, 4: {}, 5: {}, 2: {}, 3: {}, 1: {}}))
+	_, ok = dag.cachedReverseVertex[8]
+	assert.False(t, ok)
 	cachedData, ok = dag.cachedVertexTopo[2]
 	assert.True(t, ok)
-	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{2: {}, 5: {}, 7: {}, 8: {}}))
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{2: {}}))
+	_, ok = dag.cachedReverseVertex[2]
+	assert.False(t, ok)
+
+	tb, err = dag.TopologicalBatch(1, 2, 8)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, tb[0], []int{1, 2})
+	assert.ElementsMatch(t, tb[1], []int{3, 5})
+	assert.ElementsMatch(t, tb[2], []int{4})
+	assert.ElementsMatch(t, tb[3], []int{7})
+	assert.ElementsMatch(t, tb[4], []int{8})
+	cachedData, ok = dag.cachedVertexTopo[1]
+	assert.True(t, ok)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{1: {}}))
+	_, ok = dag.cachedReverseVertex[1]
+	assert.False(t, ok)
+	cachedData, ok = dag.cachedVertexTopo[8]
+	assert.True(t, ok)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{8: {}, 7: {}, 4: {}, 5: {}, 2: {}, 3: {}, 1: {}}))
+	_, ok = dag.cachedReverseVertex[8]
+	assert.False(t, ok)
+	cachedData, ok = dag.cachedVertexTopo[2]
+	assert.True(t, ok)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{2: {}}))
+	_, ok = dag.cachedReverseVertex[2]
+	assert.False(t, ok)
+
+	tb, err = dag.TopologicalBatch(10)
+	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 1)
+	assert.ElementsMatch(t, tb[0], []int{10})
+	cachedData, ok = dag.cachedVertexTopo[1]
+	assert.True(t, ok)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{1: {}}))
+	_, ok = dag.cachedReverseVertex[1]
+	assert.False(t, ok)
+	cachedData, ok = dag.cachedVertexTopo[8]
+	assert.True(t, ok)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{8: {}, 7: {}, 4: {}, 5: {}, 2: {}, 3: {}, 1: {}}))
+	_, ok = dag.cachedReverseVertex[8]
+	assert.False(t, ok)
+	cachedData, ok = dag.cachedVertexTopo[2]
+	assert.True(t, ok)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{2: {}}))
+	_, ok = dag.cachedReverseVertex[2]
+	assert.False(t, ok)
 
 	assert.NoError(t, dag.RemoveEdge(1, 3))
 	assert.NoError(t, dag.RemoveEdge(1, 4))
@@ -449,28 +498,36 @@ func TestTopologicalBatchSequentially(t *testing.T) {
 	assert.ElementsMatch(t, tb[5], []int{6})
 	assert.ElementsMatch(t, tb[6], []int{7, 8})
 
+	tb, err = dag.TopologicalBatch([]int{1, 2})
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(tb))
+	assert.ElementsMatch(t, tb[0], []int{9, 10})
+	assert.ElementsMatch(t, tb[1], []int{1})
+	assert.ElementsMatch(t, tb[2], []int{2})
+
 	assert.NoError(t, dag.RemoveEdge(1, 2))
 	assert.NoError(t, dag.RemoveEdge(6, 8))
 	dag.CheckCycle()
 	tb, err = dag.TopologicalBatch(1, 2)
 	assert.NoError(t, err)
-	assert.Equal(t, 6, len(tb))
-	assert.ElementsMatch(t, tb[0], []int{1, 2})
-	assert.ElementsMatch(t, tb[1], []int{3, 8})
-	assert.ElementsMatch(t, tb[2], []int{4})
-	assert.ElementsMatch(t, tb[3], []int{5})
-	assert.ElementsMatch(t, tb[4], []int{6})
-	assert.ElementsMatch(t, tb[5], []int{7})
+	assert.Equal(t, 2, len(tb))
+	assert.ElementsMatch(t, tb[0], []int{9, 10})
+	assert.ElementsMatch(t, tb[1], []int{1, 2})
 
 	tb, err = dag.TopologicalBatch([]int{1, 2})
 	assert.NoError(t, err)
-	assert.Equal(t, 6, len(tb))
-	assert.ElementsMatch(t, tb[0], []int{1, 2})
-	assert.ElementsMatch(t, tb[1], []int{3, 8})
-	assert.ElementsMatch(t, tb[2], []int{4})
-	assert.ElementsMatch(t, tb[3], []int{5})
-	assert.ElementsMatch(t, tb[4], []int{6})
-	assert.ElementsMatch(t, tb[5], []int{7})
+	assert.Equal(t, 2, len(tb))
+	assert.ElementsMatch(t, tb[0], []int{9, 10})
+	assert.ElementsMatch(t, tb[1], []int{1, 2})
+
+	tb, err = dag.TopologicalBatch([]int{5, 2})
+	assert.NoError(t, err)
+	assert.Equal(t, 5, len(tb))
+	assert.ElementsMatch(t, tb[0], []int{9, 10})
+	assert.ElementsMatch(t, tb[1], []int{1, 2})
+	assert.ElementsMatch(t, tb[2], []int{3})
+	assert.ElementsMatch(t, tb[3], []int{4})
+	assert.ElementsMatch(t, tb[4], []int{5})
 
 }
 
@@ -502,15 +559,49 @@ func TestTopologicalBatchReversely(t *testing.T) {
 	assert.ElementsMatch(t, tb[2], []int{5, 4})
 	assert.ElementsMatch(t, tb[3], []int{3, 2})
 	assert.ElementsMatch(t, tb[4], []int{1})
-	cachedData, ok := dag.cachedVertexTopo[1]
+	cachedData, ok := dag.cachedReverseVertex[1]
 	assert.True(t, ok)
 	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{1: {}, 3: {}, 4: {}, 6: {}, 7: {}, 8: {}}))
-	cachedData, ok = dag.cachedVertexTopo[8]
+	_, ok = dag.cachedVertexTopo[1]
+	assert.False(t, ok)
+	cachedData, ok = dag.cachedReverseVertex[8]
 	assert.True(t, ok)
 	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{8: {}}))
-	cachedData, ok = dag.cachedVertexTopo[2]
+	_, ok = dag.cachedVertexTopo[8]
+	assert.False(t, ok)
+	cachedData, ok = dag.cachedReverseVertex[2]
 	assert.True(t, ok)
 	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{2: {}, 5: {}, 7: {}, 8: {}}))
+	_, ok = dag.cachedVertexTopo[2]
+	assert.False(t, ok)
+
+	tb, err = dag.TopologicalBatch(1, 2, 8, Reverse)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, tb[0], []int{8, 6})
+	assert.ElementsMatch(t, tb[1], []int{7})
+	assert.ElementsMatch(t, tb[2], []int{5, 4})
+	assert.ElementsMatch(t, tb[3], []int{3, 2})
+	assert.ElementsMatch(t, tb[4], []int{1})
+	cachedData, ok = dag.cachedReverseVertex[1]
+	assert.True(t, ok)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{1: {}, 3: {}, 4: {}, 6: {}, 7: {}, 8: {}}))
+	_, ok = dag.cachedVertexTopo[1]
+	assert.False(t, ok)
+	cachedData, ok = dag.cachedReverseVertex[8]
+	assert.True(t, ok)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{8: {}}))
+	_, ok = dag.cachedVertexTopo[8]
+	assert.False(t, ok)
+	cachedData, ok = dag.cachedReverseVertex[2]
+	assert.True(t, ok)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{2: {}, 5: {}, 7: {}, 8: {}}))
+	_, ok = dag.cachedVertexTopo[2]
+	assert.False(t, ok)
+	cachedData, ok = dag.cachedReverseVertex[10]
+	assert.True(t, ok)
+	assert.ElementsMatch(t, mapToSlice(cachedData), mapToSlice(map[int]struct{}{10: {}}))
+	_, ok = dag.cachedVertexTopo[10]
+	assert.False(t, ok)
 
 	assert.NoError(t, dag.RemoveEdge(1, 3))
 	assert.NoError(t, dag.RemoveEdge(1, 4))
@@ -530,6 +621,11 @@ func TestTopologicalBatchReversely(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(tb))
 	assert.ElementsMatch(t, tb[0], []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+
+	tb, err = dag.TopologicalBatch(Reverse, []int{1, 2})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(tb))
+	assert.ElementsMatch(t, tb[0], []int{1, 2})
 
 	assert.NoError(t, dag.AddEdge(1, 3))
 	assert.NoError(t, dag.AddEdge(3, 4))
@@ -594,27 +690,49 @@ func TestTopologicalBatchSequentiallyWithAlreadyDone(t *testing.T) {
 	dag.CheckCycle()
 	tb, err := dag.TopologicalBatch(1, 4)
 	assert.NoError(t, err)
-	assert.Equal(t, len(tb), 3)
+	assert.Equal(t, len(tb), 1)
 	assert.ElementsMatch(t, tb[0], []int{1, 4})
-	assert.ElementsMatch(t, tb[1], []int{2})
-	assert.ElementsMatch(t, tb[2], []int{3})
+
+	tb, err = dag.TopologicalBatch(AlreadyDone[int]{3})
+	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 1)
+	assert.ElementsMatch(t, tb[0], []int{5})
 
 	tb, err = dag.TopologicalBatch(1, 4, AlreadyDone[int]{3})
 	assert.NoError(t, err)
-	assert.Equal(t, len(tb), 2)
-	assert.ElementsMatch(t, tb[0], []int{1, 4})
-	assert.ElementsMatch(t, tb[1], []int{2})
+	assert.Equal(t, len(tb), 0)
 
 	tb, err = dag.TopologicalBatch(1, 4, AlreadyDone[int]{2})
 	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 1)
+	assert.ElementsMatch(t, tb[0], []int{4})
+
+	tb, err = dag.TopologicalBatch(AlreadyDone[int]{2})
+	assert.NoError(t, err)
 	assert.Equal(t, len(tb), 2)
-	assert.ElementsMatch(t, tb[0], []int{1, 4})
+	assert.ElementsMatch(t, tb[0], []int{4, 5})
 	assert.ElementsMatch(t, tb[1], []int{3})
 
 	tb, err = dag.TopologicalBatch(1, 4, AlreadyDone[int]{2, 3})
 	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 0)
+
+	tb, err = dag.TopologicalBatch(AlreadyDone[int]{2, 3})
+	assert.NoError(t, err)
 	assert.Equal(t, len(tb), 1)
+	assert.ElementsMatch(t, tb[0], []int{5})
+
+	tb, err = dag.TopologicalBatch(AlreadyDone[int]{2, 4})
+	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 1)
+	assert.ElementsMatch(t, tb[0], []int{5, 3})
+
+	tb, err = dag.TopologicalBatch(AlreadyDone[int]{5})
+	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 3)
 	assert.ElementsMatch(t, tb[0], []int{1, 4})
+	assert.ElementsMatch(t, tb[1], []int{2})
+	assert.ElementsMatch(t, tb[2], []int{3})
 
 	dag = NewDag[int, int]("debug")
 	assert.NoError(t, dag.AddVertex(1, 1))
@@ -635,24 +753,27 @@ func TestTopologicalBatchSequentiallyWithAlreadyDone(t *testing.T) {
 
 	tb, err = dag.TopologicalBatch(1, 4)
 	assert.NoError(t, err)
-	assert.Equal(t, len(tb), 4)
+	assert.Equal(t, len(tb), 1)
 	assert.ElementsMatch(t, tb[0], []int{1, 4})
-	assert.ElementsMatch(t, tb[1], []int{2, 5})
-	assert.ElementsMatch(t, tb[2], []int{3, 6})
-	assert.ElementsMatch(t, tb[3], []int{7})
 
 	tb, err = dag.TopologicalBatch(1, 4, AlreadyDone[int]{6, 2})
 	assert.NoError(t, err)
-	assert.Equal(t, len(tb), 2)
-	assert.ElementsMatch(t, tb[0], []int{1, 4})
-	assert.ElementsMatch(t, tb[1], []int{5})
+	assert.Equal(t, len(tb), 0)
 
 	tb, err = dag.TopologicalBatch(1, 4, AlreadyDone[int]{5})
 	assert.NoError(t, err)
-	assert.Equal(t, len(tb), 3)
-	assert.ElementsMatch(t, tb[0], []int{1, 4})
-	assert.ElementsMatch(t, tb[1], []int{2, 6})
-	assert.ElementsMatch(t, tb[2], []int{3, 7})
+	assert.Equal(t, len(tb), 1)
+	assert.ElementsMatch(t, tb[0], []int{1})
+
+	tb, err = dag.TopologicalBatch(1, 7, AlreadyDone[int]{6})
+	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 1)
+	assert.ElementsMatch(t, tb[0], []int{7})
+
+	tb, err = dag.TopologicalBatch(2, 7, AlreadyDone[int]{6})
+	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 1)
+	assert.ElementsMatch(t, tb[0], []int{2, 7})
 
 }
 
@@ -706,10 +827,16 @@ func TestTopologicalBatchReverselyWithAlreadyDone(t *testing.T) {
 	assert.ElementsMatch(t, tb[1], []int{2})
 	assert.ElementsMatch(t, tb[2], []int{1})
 
+	tb, err = dag.TopologicalBatch(2, 5, AlreadyDone[int]{4, 7, 8, 6}, Reverse)
+	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 2)
+	assert.ElementsMatch(t, tb[0], []int{3, 5})
+	assert.ElementsMatch(t, tb[1], []int{2})
+
 	tb, err = dag.TopologicalBatch(1, 5, AlreadyDone[int]{2}, Reverse)
 	assert.NoError(t, err)
 	assert.Equal(t, len(tb), 4)
-	assert.ElementsMatch(t, tb[0], []int{8, 4, 1})
+	assert.ElementsMatch(t, tb[0], []int{8, 1})
 	assert.ElementsMatch(t, tb[1], []int{7})
 	assert.ElementsMatch(t, tb[2], []int{6})
 	assert.ElementsMatch(t, tb[3], []int{5})
@@ -753,9 +880,33 @@ func TestTopologicalBatchReverselyWithAlreadyDone(t *testing.T) {
 	tb, err = dag.TopologicalBatch(1, 4, AlreadyDone[int]{5}, Reverse)
 	assert.NoError(t, err)
 	assert.Equal(t, len(tb), 3)
-	assert.ElementsMatch(t, tb[0], []int{3, 4, 7})
-	assert.ElementsMatch(t, tb[1], []int{2, 6})
+	assert.ElementsMatch(t, tb[0], []int{3, 4})
+	assert.ElementsMatch(t, tb[1], []int{2})
 	assert.ElementsMatch(t, tb[2], []int{1})
+
+	tb, err = dag.TopologicalBatch(2, 4, AlreadyDone[int]{5}, Reverse)
+	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 2)
+	assert.ElementsMatch(t, tb[0], []int{3, 4})
+	assert.ElementsMatch(t, tb[1], []int{2})
+
+	tb, err = dag.TopologicalBatch(2, 4, AlreadyDone[int]{3, 5}, Reverse)
+	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 1)
+	assert.ElementsMatch(t, tb[0], []int{2, 4})
+
+	tb, err = dag.TopologicalBatch(3, 4, AlreadyDone[int]{5}, Reverse)
+	assert.NoError(t, err)
+	assert.Equal(t, len(tb), 1)
+	assert.ElementsMatch(t, tb[0], []int{3, 4})
+
+	tb, err = dag.TopologicalBatch(100, AlreadyDone[int]{2}, Reverse)
+	assert.EqualError(t, err, "没有名字叫100的节点")
+	assert.Equal(t, len(tb), 0)
+
+	tb, err = dag.TopologicalBatch(1, 4, AlreadyDone[int]{101}, Reverse)
+	assert.EqualError(t, err, "没有名字叫101的节点")
+	assert.Equal(t, len(tb), 0)
 }
 
 func TestCopy(t *testing.T) {
@@ -909,6 +1060,107 @@ func TestCanReach(t *testing.T) {
 	assert.True(t, yes)
 }
 
+func TestNextBatch(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	assert.NoError(t, dag.AddVertex(1, 1))
+	assert.NoError(t, dag.AddVertex(2, 2))
+	assert.NoError(t, dag.AddVertex(3, 3))
+	assert.NoError(t, dag.AddVertex(4, 4))
+	assert.NoError(t, dag.AddVertex(5, 5))
+	assert.NoError(t, dag.AddVertex(6, 6))
+	assert.NoError(t, dag.AddVertex(7, 7))
+	assert.NoError(t, dag.AddVertex(8, 8))
+
+	assert.NoError(t, dag.AddEdge(1, 2))
+	assert.NoError(t, dag.AddEdge(1, 5))
+	assert.NoError(t, dag.AddEdge(1, 6))
+	assert.NoError(t, dag.AddEdge(5, 6))
+	assert.NoError(t, dag.AddEdge(6, 3))
+	assert.NoError(t, dag.AddEdge(6, 7))
+	assert.NoError(t, dag.AddEdge(7, 4))
+	assert.NoError(t, dag.AddEdge(7, 8))
+	assert.NoError(t, dag.AddEdge(4, 8))
+
+	pass, cycles := dag.CheckCycle()
+	assert.True(t, pass)
+	assert.Equal(t, 0, len(cycles))
+
+	next, err := dag.NextBatch()
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{1})
+
+	next, err = dag.NextBatch(AlreadyDone[int]{2})
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{5})
+
+	next, err = dag.NextBatch(AlreadyDone[int]{1})
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{5, 2})
+
+	next, err = dag.NextBatch(AlreadyDone[int]{6})
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{2, 3, 7})
+
+}
+
+func TestNextBatchReversely(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	assert.NoError(t, dag.AddVertex(1, 1))
+	assert.NoError(t, dag.AddVertex(2, 2))
+	assert.NoError(t, dag.AddVertex(3, 3))
+	assert.NoError(t, dag.AddVertex(4, 4))
+	assert.NoError(t, dag.AddVertex(5, 5))
+	assert.NoError(t, dag.AddVertex(6, 6))
+	assert.NoError(t, dag.AddVertex(7, 7))
+	assert.NoError(t, dag.AddVertex(8, 8))
+
+	assert.NoError(t, dag.AddEdge(1, 2))
+	assert.NoError(t, dag.AddEdge(1, 5))
+	assert.NoError(t, dag.AddEdge(1, 6))
+	assert.NoError(t, dag.AddEdge(5, 6))
+	assert.NoError(t, dag.AddEdge(6, 3))
+	assert.NoError(t, dag.AddEdge(6, 7))
+	assert.NoError(t, dag.AddEdge(7, 4))
+	assert.NoError(t, dag.AddEdge(7, 8))
+	assert.NoError(t, dag.AddEdge(4, 8))
+
+	pass, cycles := dag.CheckCycle()
+	assert.True(t, pass)
+	assert.Equal(t, 0, len(cycles))
+
+	next, err := dag.NextBatch(Reverse)
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{2, 3, 8})
+
+	next, err = dag.NextBatch(Reverse, AlreadyDone[int]{2})
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{3, 8})
+
+	next, err = dag.NextBatch(Reverse, AlreadyDone[int]{1})
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{})
+
+	next, err = dag.NextBatch(Reverse, AlreadyDone[int]{6})
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{2, 5})
+
+	next, err = dag.NextBatch(5, Reverse, AlreadyDone[int]{6})
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{5})
+
+	next, err = dag.NextBatch(5, Reverse, AlreadyDone[int]{4})
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{3, 7})
+
+	next, err = dag.NextBatch(2, Reverse, AlreadyDone[int]{6})
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{2})
+
+	next, err = dag.NextBatch(7, Reverse, AlreadyDone[int]{4})
+	assert.Nil(t, err)
+	assert.ElementsMatch(t, next, []int{7})
+}
+
 func TestRaceAdd(t *testing.T) {
 	dag := NewDag[string, string]("debug")
 	wg := sync.WaitGroup{}
@@ -1058,6 +1310,10 @@ func TestRaceSortNoThreadSafeNoCheckCycle(t *testing.T) {
 				dag.TopologicalSort()
 				dag.TopologicalBatch()
 				dag.TopologicalBatch(Reverse)
+				dag.NextBatch()
+				dag.NextBatch(Reverse)
+				dag.NextBatch(AlreadyDone[int]{1, 2})
+				dag.NextBatch(AlreadyDone[int]{1, 2}, Reverse)
 			}
 		}()
 	}
@@ -1171,6 +1427,7 @@ func TestRaceSortThreadSafeNoCheckCycle(t *testing.T) {
 	wg.Wait()
 }
 
+// Benchmark
 func BenchmarkDag(b *testing.B) {
 	dag := NewDag[int, int]("debug")
 	for i := 0; i < 100; i++ {
@@ -1237,6 +1494,8 @@ func BenchmarkDag2(b *testing.B) {
 				dag.TopologicalSort()
 				dag.TopologicalBatch()
 				dag.TopologicalBatch(Reverse)
+				dag.NextBatch()
+				dag.NextBatch(Reverse)
 			}
 		}()
 	}
@@ -1273,9 +1532,137 @@ func BenchmarkDag3(b *testing.B) {
 				dag.TopologicalSort()
 				dag.TopologicalBatch()
 				dag.TopologicalBatch(Reverse)
+				dag.NextBatch()
+				dag.NextBatch(Reverse)
 			}
 		}()
 	}
 	wg.Wait()
 
+}
+
+func BenchmarkDag4(b *testing.B) {
+	dag := NewDag[int, int]("debug", DisableThreadSafe)
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+	dag.CheckCycle()
+
+	for i := 0; i < b.N; i++ {
+		dag.TopologicalSort()
+	}
+}
+
+
+func BenchmarkDag5(b *testing.B) {
+	dag := NewDag[int, int]("debug", DisableThreadSafe)
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+	dag.CheckCycle()
+
+	for i := 0; i < b.N; i++ {
+		dag.TopologicalBatch()
+	}
+}
+
+func BenchmarkDag6(b *testing.B) {
+	dag := NewDag[int, int]("debug", DisableThreadSafe)
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+	dag.CheckCycle()
+
+	for i := 0; i < b.N; i++ {
+		dag.TopologicalBatch(Reverse)
+	}
+}
+
+func BenchmarkDag7(b *testing.B) {
+	dag := NewDag[int, int]("debug", DisableThreadSafe)
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+	dag.CheckCycle()
+
+	for i := 0; i < b.N; i++ {
+		dag.NextBatch()
+	}
+}
+
+func BenchmarkDag8(b *testing.B) {
+	dag := NewDag[int, int]("debug", DisableThreadSafe)
+	for i := 0; i < 100; i++ {
+		dag.AddVertex(i, i)
+	}
+
+	dag.AddEdge(10, 30)
+	dag.AddEdge(10, 20)
+	dag.AddEdge(14, 40)
+	dag.AddEdge(31, 40)
+	dag.AddEdge(43, 50)
+	dag.AddEdge(70, 65)
+	dag.AddEdge(43, 51)
+	dag.AddEdge(32, 33)
+	dag.AddEdge(1, 70)
+	dag.AddEdge(11, 13)
+	dag.AddEdge(34, 31)
+	dag.AddEdge(2, 3)
+	dag.CheckCycle()
+
+	for i := 0; i < b.N; i++ {
+		dag.NextBatch(Reverse)
+	}
 }
