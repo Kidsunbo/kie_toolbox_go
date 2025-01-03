@@ -162,6 +162,28 @@ func TestHasVertex(t *testing.T) {
 	assert.False(t, dag.HasVertex(10))
 }
 
+func TestGetVertex(t *testing.T) {
+	dag := NewDag[int, int]("debug")
+	assert.NoError(t, dag.AddVertex(1, 1))
+	assert.NoError(t, dag.AddVertex(2, 2))
+	assert.NoError(t, dag.AddVertex(3, 3))
+	assert.NoError(t, dag.AddVertex(4, 4))
+	assert.NoError(t, dag.AddVertex(5, 5))
+	assert.NoError(t, dag.AddVertex(6, 6))
+	assert.NoError(t, dag.AddVertex(7, 7))
+	assert.NoError(t, dag.AddVertex(8, 8))
+
+	assert.Equal(t, 0, len(dag.cachedFullTopo))
+	assert.Equal(t, 8, len(dag.vertices))
+
+	value, exist := dag.GetVertex(4)
+	assert.True(t, exist)
+	assert.Equal(t, 4, value)
+	value, exist = dag.GetVertex(10)
+	assert.False(t, exist)
+	assert.Equal(t, 0, value)
+}
+
 func TestAddEdge(t *testing.T) {
 	dag := NewDag[int, int]("debug", EnglishError)
 	assert.NoError(t, dag.AddVertex(1, 1))
@@ -919,15 +941,20 @@ func TestCopy(t *testing.T) {
 	dag.AddEdge(1, 2)
 	dag.AddEdge(2, 4)
 	dag.AddEdge(3, 4)
-	dagCp := dag.Copy(nil)
+	dagCp := dag.Copy()
 	assert.Equal(t, "debug_copy", dagCp.name)
 	assert.NotSame(t, dag.vertices, dagCp.vertices)
 	assert.Equal(t, 1, dag.vertices[1].value)
 
-	dagCp = dag.Copy(func(i int) int { return i + 1 })
+	dagCp = dag.Copy(Copier[int](func(i int) int { return i + 1 }))
 	assert.Equal(t, "debug_copy", dagCp.name)
 	assert.NotSame(t, dag.vertices, dagCp.vertices)
 	assert.Equal(t, 2, dagCp.vertices[1].value)
+
+	dagCp = dag.Copy(func(i int) int { return i + 1 })
+	assert.Equal(t, "debug_copy", dagCp.name)
+	assert.NotSame(t, dag.vertices, dagCp.vertices)
+	assert.Equal(t, 1, dagCp.vertices[1].value)
 }
 
 func TestString(t *testing.T) {
@@ -1565,7 +1592,6 @@ func BenchmarkDag4(b *testing.B) {
 		dag.TopologicalSort()
 	}
 }
-
 
 func BenchmarkDag5(b *testing.B) {
 	dag := NewDag[int, int]("debug", DisableThreadSafe)
