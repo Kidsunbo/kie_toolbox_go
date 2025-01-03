@@ -44,6 +44,7 @@ import (
 
 type Flag struct{ id int }
 type AlreadyDone[T any] []T
+type Copier[T any] func(T) T
 
 var DisableThreadSafe = Flag{id: 1}
 var Reverse = Flag{id: 2}
@@ -257,8 +258,27 @@ func (d *Dag[K, T]) HasVertex(name K) bool {
 }
 
 func (d *Dag[K, T]) hasVertex(name K) bool {
-	_, exist := d.vertices[name]
+	_, exist := d.getVertex(name)
 	return exist
+}
+
+// GetVertex gets the vertex of the K.
+func (d *Dag[K, T]) GetVertex(name K) (T, bool) {
+	if !d.disableMutex {
+		d.mu.RLock()
+		defer d.mu.RUnlock()
+	}
+
+	return d.getVertex(name)
+}
+
+func (d *Dag[K, T]) getVertex(name K) (T, bool) {
+	var t T
+	vertex, exist := d.vertices[name]
+	if !exist {
+		return t, false
+	}
+	return vertex.value, true
 }
 
 // AddEdge adds the relationship between two vertex, which might cause a cycle in dag. If the key of from vertex and the to vertex doesn't exist, an error is returned
@@ -859,17 +879,21 @@ func (d *Dag[K, T]) Dot() string {
 }
 
 // Copy will copy the whole graph but the cached data.
-func (d *Dag[K, T]) Copy(valueCopyFunction func(T) T) *Dag[K, T] {
+func (d *Dag[K, T]) Copy(params ...any) *Dag[K, T] {
 	if !d.disableMutex {
 		d.mu.RLock()
 		defer d.mu.RUnlock()
 	}
 
-	if valueCopyFunction == nil {
-		valueCopyFunction = func(t T) T {
-			return t
+	valueCopyFunction := Copier[T](func(t T) T {
+		return t
+	})
+	for _, param := range params {
+		if f, ok := param.(Copier[T]); ok {
+			valueCopyFunction = f
 		}
 	}
+
 	cpVertices := make(map[K]*vertex[K, T])
 	for _, vertex := range d.vertices {
 		value := valueCopyFunction(vertex.value)
