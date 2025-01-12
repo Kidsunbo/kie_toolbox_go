@@ -1,19 +1,6 @@
 package kflow
 
-type config struct {
-	errMsgMap map[errorIndex]string
-}
 
-func NewConfig()*config{
-	return &config{
-		errMsgMap: chinese,
-	}
-}
+type Flag struct{ id int }
 
-func (c *config) ReportErrorInEnglish() {
-	c.errMsgMap = english
-}
-
-func (c *config) ReportErrorInChinese() {
-	c.errMsgMap = chinese
-}
+var StaticNodes = Flag{id:1} // The nodes will never changed after initialization

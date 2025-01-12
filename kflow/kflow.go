@@ -1,20 +1,27 @@
 package kflow
 
-import (
-	"context"
-	"reflect"
-)
+import "github.com/Kidsunbo/kie_toolbox_go/container"
 
-func Add[T INode](f iAddable, constructor nodeConstructor[T]) error {
-	var output T
-	rawType := reflect.TypeOf(&output).Elem()
-	nodeType, ptrDepth := deferenceToNonePtr(f.getConfig(), rawType)
-	if nodeType.Kind() == reflect.Interface {
-		panic(errorMessage(f.getConfig().errMsgMap, interfaceAsReturnValueOfConstructor))
+func NewEngine[Input any, Output any, Context any](name string, params ...any) *Engine[Input, Output, Context] {
+	var staticNode bool
+	for _, param := range params {
+		if v, ok := param.(Flag); ok {
+			if v == StaticNodes {
+				staticNode = true
+			}
+		}
 	}
 
-	constructorWrapper := func(ctx context.Context) INode {
-		return constructor(ctx)
+	// the nodes field
+	var nodes *container.Dag[string, INode]
+	if staticNode {
+		nodes = container.NewDag[string, INode](name, container.DisableThreadSafe)
+	} else {
+		nodes = container.NewDag[string, INode](name)
 	}
-	return f.addNodeConstructor(nodeType, ptrDepth, constructorWrapper)
+
+	return &Engine[Input, Output, Context]{
+		nodes: nodes,
+	}
 }
+
