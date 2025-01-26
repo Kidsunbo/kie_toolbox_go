@@ -883,6 +883,11 @@ func (d *Dag[K, T]) SetName(name string) {
 	d.name = name
 }
 
+// GetName gets the name of the dag.
+func (d *Dag[K, T]) GetName() string {
+	return d.name
+}
+
 // Copy will copy the whole graph but the cached data.
 func (d *Dag[K, T]) Copy(params ...any) *Dag[K, T] {
 	if !d.disableMutex {
