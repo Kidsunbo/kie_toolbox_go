@@ -2,7 +2,7 @@ package kflow
 
 type Node[T any] struct{}
 
-func (n *Node[T]) ConditionDependence(name string, when Condition[T], conditionDependence []dependenceReturnType[T]) *dependence[T] {
+func (n *Node[T]) ConditionDependence(name string, when Condition[T], conditionDependence []string) *dependence[T] {
 	return &dependence[T]{
 		DependenceName:      name,
 		Condition:           when,
