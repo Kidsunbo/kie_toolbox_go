@@ -15,6 +15,7 @@ type nodeEngine[T any] struct {
 	executor IExecutor[T]
 }
 
+// NewEngine creates a node engine that runs all the node.
 func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
 	config := &config{
 		Static:   false,
@@ -60,42 +61,54 @@ func (n *nodeEngine[T]) Prepare() error {
 	return nil
 }
 
-func (n *nodeEngine[T]) Run(ctx context.Context, note T) error {
-	return n.RunNodes(ctx, note, nil)
-}
-
-func (n *nodeEngine[T]) RunNode(ctx context.Context, note T, node string) error {
-	return n.RunNodes(ctx, note, []string{node})
-}
-
-func (n *nodeEngine[T]) RunNodes(ctx context.Context, note T, nodes []string) error {
-	if err := n.check(); err != nil {
+func (n *nodeEngine[T]) Run(ctx context.Context, state T, nodes ...string) error {
+	if err := n.check(nodes); err != nil {
 		return err
 	}
 
-	if err := n.execute(ctx, note, nodes); err != nil {
+	if err := n.execute(ctx, state, nodes); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (n *nodeEngine[T]) check() error {
+func (n *nodeEngine[T]) check(nodes []string) error {
 	if !n.nodes.IsChecked() {
 		return errors.New(message(n.config.Language, notPreparedError))
 	}
 
+	if len(nodes) == 0 {
+		return errors.New(message(n.config.Language, nodeNotSpecified))
+	}
+
+	for _, node := range nodes {
+		if !n.nodes.HasVertex(node) {
+			return fmt.Errorf(message(n.config.Language, nodeNotExist), node)
+		}
+	}
+
 	return nil
 }
 
-func (n *nodeEngine[T]) execute(ctx context.Context, note T, nodes []string) error {
-	return n.executor.Execute(ctx, n.nodes, note, n.makePlan(nodes))
+func (n *nodeEngine[T]) execute(ctx context.Context, state T, nodes []string) error {
+	return n.executor.Execute(ctx, n.nodes, state, n.makePlan(nodes))
 }
 
 func (n *nodeEngine[T]) makePlan(nodes []string) *Plan {
+	targets := make(map[string]struct{})
+	for _, node := range nodes {
+		targets[node] = struct{}{}
+	}
+
 	return &Plan{
-		Nodes:     nodes,
-		StartTime: time.Now(),
+		Config:         n.config,
+		SpecifiedNodes: nodes,
+		CurrentNode:    "",
+		TargetNodes:    targets,
+		FinishNodes:    map[string]*ExecuteResult{},
+		FailedNodes:    map[string]struct{}{},
+		StartTime:      time.Now(),
 	}
 }
 

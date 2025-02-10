@@ -15,11 +15,15 @@ type textIndexType int32
 const (
 	cycleDetectedError textIndexType = iota
 	notPreparedError
+	nodeNotExist
+	nodeNotSpecified
 )
 
 var msg = map[textIndexType]languagePack{
 	cycleDetectedError: {Chinese: "监测到环存在, %v", English: "cycles detected, %v"},
 	notPreparedError:   {Chinese: "调用前未准备, 请先调用Prepare方法", English: "Not prepare before run, please call Prepare method before"},
+	nodeNotExist:       {Chinese: "节点[%v]不存在", English: "node [%v] does not exist"},
+	nodeNotSpecified:   {Chinese: "未指定运行节点", English: "running node is not specified"},
 }
 
 func message(lang int8, text textIndexType) string {
