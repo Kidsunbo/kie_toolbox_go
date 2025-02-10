@@ -2,16 +2,16 @@ package kflow
 
 type Node[T any] struct{}
 
-func (n *Node[T]) ConditionDependence(name string, when Condition[T], conditionDependence []string) *dependence[T] {
-	return &dependence[T]{
+func (n *Node[T]) ConditionalDependence(name string, when Condition[T], conditionDependence []string) *Dependence[T] {
+	return &Dependence[T]{
 		DependenceName:      name,
 		Condition:           when,
 		ConditionDependence: conditionDependence,
 	}
 }
 
-func (n *Node[T]) StaticDependence(name string) *dependence[T] {
-	return &dependence[T]{
+func (n *Node[T]) StaticDependence(name string) *Dependence[T] {
+	return &Dependence[T]{
 		DependenceName:      name,
 		Condition:           nil,
 		ConditionDependence: nil,
@@ -19,7 +19,7 @@ func (n *Node[T]) StaticDependence(name string) *dependence[T] {
 }
 
 type NodeBox[T any] struct {
-	node       INode[T, dependenceReturnType[T]]
-	conditions []Condition[T]
-	nodeType   int64
+	node       INode[T]
+	boxName    string
+	conditions Condition[T]
 }

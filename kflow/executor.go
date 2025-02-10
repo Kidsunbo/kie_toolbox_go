@@ -13,7 +13,19 @@ func newNodeExecutor[T any]() *nodeExecutor[T] {
 	return &nodeExecutor[T]{}
 }
 
-func (n *nodeExecutor[T]) Execute(ctx context.Context, nodes *container.Dag[string, NodeBox[T]], note T, plan *Plan) error {
+func (n *nodeExecutor[T]) Execute(ctx context.Context, nodes *container.Dag[string, NodeBox[T]], state T, plan *Plan) error {
 
+	for _, node := range plan.SpecifiedNodes {
+		plan.CurrentNode = node
+
+
+	}
+
+
+	return nil
+}
+
+func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[string, NodeBox[T]], state T, plan *Plan) error {
+	 
 	return nil
 }
