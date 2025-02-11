@@ -13,7 +13,7 @@ type INode[T any] interface {
 }
 
 type dependenceReturnType[T any] interface {
-	string | Dependence[T]
+	string | *Dependence[T]
 }
 
 type IDependency[T any, R dependenceReturnType[T]] interface {
@@ -35,7 +35,7 @@ type IFlowNode[T any] interface {
 type Condition[T any] func(context.Context, T) bool
 
 type IExecutor[T any] interface {
-	Execute(context.Context, *container.Dag[string, *NodeBox[T]], T, *Plan) error
+	Execute(context.Context, *container.Dag[string, *nodeBox[T]], T, *Plan) error
 }
 
 type IBefore[T any] interface {
@@ -62,7 +62,7 @@ type ExecuteResult struct {
 	Skipped       bool      // if the node is skipped
 	SkippedReason string    // if the node is skipped, this field indicates the reason
 	StartTime     time.Time // when the node is started
-	TimeCost      int64     // the time cost for this node
+	EndTime       time.Time // when the node is ended
 	ExecuteBy     string    // the name of specified node which passed with run method which execute the current node
 }
 

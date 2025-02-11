@@ -15,7 +15,7 @@ func newNodeExecutor[T any]() *nodeExecutor[T] {
 	return &nodeExecutor[T]{}
 }
 
-func (n *nodeExecutor[T]) Execute(ctx context.Context, nodes *container.Dag[string, *NodeBox[T]], state T, plan *Plan) error {
+func (n *nodeExecutor[T]) Execute(ctx context.Context, nodes *container.Dag[string, *nodeBox[T]], state T, plan *Plan) error {
 
 	for _, node := range plan.ChainNodes {
 		plan.CurrentNode = node
@@ -27,7 +27,7 @@ func (n *nodeExecutor[T]) Execute(ctx context.Context, nodes *container.Dag[stri
 	return nil
 }
 
-func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[string, *NodeBox[T]], state T, plan *Plan) error {
+func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[string, *nodeBox[T]], state T, plan *Plan) error {
 	// add currrent node to UnfinishedNodes
 	plan.TargetNodes[plan.CurrentNode] = struct{}{}
 	defer func() {
@@ -36,7 +36,7 @@ func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[
 
 	tunnel := make(chan *ExecuteResult)
 	for {
-		var result *ExecuteResult
+		var result []*ExecuteResult
 		stop, err := n.executeNodesInParallel(ctx, nodes, state, plan, tunnel, &result)
 		if err != nil {
 			return err
@@ -54,7 +54,7 @@ func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[
 	return nil
 }
 
-func (n *nodeExecutor[T]) executeNodesInParallel(ctx context.Context, nodes *container.Dag[string, *NodeBox[T]], state T, plan *Plan, tunnel chan *ExecuteResult, out **ExecuteResult) (bool, error) {
+func (n *nodeExecutor[T]) executeNodesInParallel(ctx context.Context, nodes *container.Dag[string, *nodeBox[T]], state T, plan *Plan, tunnel chan *ExecuteResult, out *[]*ExecuteResult) (bool, error) {
 	if len(plan.TargetNodes) == 0 {
 		return true, nil
 	}
@@ -74,9 +74,20 @@ func (n *nodeExecutor[T]) executeNodesInParallel(ctx context.Context, nodes *con
 		return false, err
 	}
 
-	batch := make([]*NodeBox[T], 0, len(candidates))
+	batch := make([]*nodeBox[T], 0, len(candidates))
+	underline := make(map[string]struct{}, len(candidates))
 	for _, node := range candidates {
-		
+		canRun, result, err := n.canRun(ctx, nodes, node, state, plan, underline)
+		if err != nil {
+			return false, err
+		}
+		if !canRun {
+			if result != nil {
+				*out = append(*out, result)
+			}
+		} else {
+			batch = append(batch, node)
+		}
 	}
 
 	if len(batch) == 0 && len(plan.RunningNodes) == 0 {
@@ -87,56 +98,55 @@ func (n *nodeExecutor[T]) executeNodesInParallel(ctx context.Context, nodes *con
 	if len(batch) == 1 && len(plan.RunningNodes) == 0 {
 		plan.InParallel = false
 		node := batch[0]
-		result, err := n.runOneNode(ctx, node, state, plan)
-		if err != nil {
-			return false, err
-		}
-		*out = result
+		result := n.runOneNode(ctx, node, state, plan)
+		*out = append(*out, result)
 	} else {
 		plan.InParallel = true
-
+		n.asyncRunNode(ctx, batch, state, plan, tunnel)
 	}
 
 	return false, nil
 }
 
-func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *NodeBox[T], state T, plan *Plan) (*ExecuteResult, error) {
-
-	originalName := node.Node.Name()
+func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *nodeBox[T], state T, plan *Plan) *ExecuteResult {
 	result := &ExecuteResult{
 		BoxName:       node.BoxName,
-		OriginalName:  originalName,
-		Success:       true,
+		OriginalName:  node.Node.Name(),
 		RunInParallel: plan.InParallel,
 		StartTime:     time.Now(),
-		TimeCost:      0,
 		ExecuteBy:     plan.CurrentNode,
 	}
 
-	// if the dependence is failed, skip execution
-	hasFailedDependence, failedNode, err := n.hasFailedDependence(nodes, node, plan)
-	if err != nil {
-		return false, err
-	} else if hasFailedDependence {
-		result.Skipped = true
-		result.SkippedReason = fmt.Sprintf(message(plan.Config.Language, nodeHasFailedDependence), node.BoxName, failedNode)
-	}
-	if !result.Skipped {
-		if !contains(plan.FinishedOriginalNodes, originalName) {
-			if err, isPanic := safeRun(func() error { return n.runOneNode(ctx, node, state, plan, result) }); err != nil {
-				result.Success = false
-				result.Err = err
-				result.IsPanic = isPanic
+	err, isPanic := safeRun(func() error {
+		if basicNode, ok := node.Node.(IBasicNode[T]); ok {
+			err := basicNode.Run(ctx, state)
+			if err != nil {
+				return err
 			}
-		} else {
-
+			return nil
+		} else if flowNode, ok := node.Node.(IFlowNode[T]); ok {
+			err := flowNode.Run(ctx, state, plan)
+			if err != nil {
+				return err
+			}
+			return nil
 		}
+		return fmt.Errorf(message(plan.Config.Language, unsupportedNodeType), node.Node.Name())
+	})
+	if err != nil {
+		result.Success = false
+		result.Err = err
+		result.IsPanic = isPanic
+		result.EndTime = time.Now()
+		return result
 	}
 
-	return nil, nil
+	result.Success = true
+	result.EndTime = time.Now()
+	return result
 }
 
-func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[string, *NodeBox[T]], node *NodeBox[T], state T, plan *Plan) (bool, *ExecuteResult, error) {
+func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[string, *nodeBox[T]], node *nodeBox[T], state T, plan *Plan, underline map[string]struct{}) (bool, *ExecuteResult, error) {
 	originalName := node.Node.Name()
 	result := &ExecuteResult{
 		BoxName:       node.BoxName,
@@ -144,18 +154,18 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 		RunInParallel: plan.InParallel,
 		IsPanic:       false,
 		StartTime:     time.Now(),
-		TimeCost:      0,
 		ExecuteBy:     plan.CurrentNode,
 	}
-	// first check if it's already done by other nodes with the same underline node.
+	// check if it's already done by other nodes with the same underline node.
 	if contains(plan.FinishedOriginalNodes, originalName) {
 		result.Success = true
 		result.Skipped = true
 		result.SkippedReason = fmt.Sprintf(message(plan.Config.Language, underlineNodeHasExecuted), originalName)
+		result.EndTime = time.Now()
 		return false, result, nil
 	}
 
-	// second check if it has failed dependence
+	// check if it has failed dependence
 	hasFailedDependence, failedNode, err := n.hasFailedDependence(nodes, node, plan)
 	if err != nil {
 		return false, nil, err
@@ -164,10 +174,16 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 		result.Success = false
 		result.Skipped = true
 		result.SkippedReason = fmt.Sprintf(message(plan.Config.Language, nodeHasFailedDependence), node.BoxName, failedNode)
+		result.EndTime = time.Now()
 		return false, result, nil
 	}
 
-	// third check if it meet the condition
+	// check if there has been the same underline node in the batch, if there is, wait to next batch to filter out.
+	if contains(underline, originalName) {
+		return false, nil, nil
+	}
+
+	// check if it meet the condition
 	if node.Conditions != nil {
 		var pass bool
 		err, isPanic := safeRun(func() error {
@@ -175,23 +191,27 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 			return nil
 		})
 		if err != nil {
+			result.Success = false
 			result.IsPanic = isPanic
 			result.Err = err
-			result.Success = false
+			result.EndTime = time.Now()
 			return false, result, nil
 		}
 		if !pass {
 			result.Success = true
 			result.Skipped = false
 			result.SkippedReason = fmt.Sprintf(message(plan.Config.Language, conditionEvaludateToFalse), node.BoxName)
+			result.EndTime = time.Now()
 			return false, result, nil
 		}
 	}
 
+	underline[originalName] = struct{}{}
+
 	return true, nil, nil
 }
 
-func (n *nodeExecutor[T]) hasFailedDependence(nodes *container.Dag[string, *NodeBox[T]], node *NodeBox[T], plan *Plan) (bool, string, error) {
+func (n *nodeExecutor[T]) hasFailedDependence(nodes *container.Dag[string, *nodeBox[T]], node *nodeBox[T], plan *Plan) (bool, string, error) {
 	for key := range plan.FailedNodes {
 		canReach, err := nodes.CanReach(node.BoxName, key)
 		if err != nil {
@@ -202,4 +222,31 @@ func (n *nodeExecutor[T]) hasFailedDependence(nodes *container.Dag[string, *Node
 		}
 	}
 	return false, "", nil
+}
+
+func (n *nodeExecutor[T]) asyncRunNode(ctx context.Context, batch []*nodeBox[T], state T, plan *Plan, tunnel chan *ExecuteResult) {
+	for _, node := range batch {
+		node := node
+		backupResult := &ExecuteResult{
+			BoxName:       node.BoxName,
+			OriginalName:  node.Node.Name(),
+			RunInParallel: plan.InParallel,
+			StartTime:     time.Now(),
+			ExecuteBy:     plan.CurrentNode,
+		}
+		go func() {
+			defer func() {
+				if a := recover(); a != nil {
+					backupResult.Success = false
+					backupResult.Err = fmt.Errorf("panic: %v", a)
+					backupResult.IsPanic = true
+					backupResult.EndTime = time.Now()
+					tunnel <- backupResult
+				}
+			}()
+
+			result := n.runOneNode(ctx, node, state, plan)
+			tunnel <- result
+		}()
+	}
 }

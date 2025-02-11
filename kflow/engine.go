@@ -11,7 +11,7 @@ import (
 
 type nodeEngine[T any] struct {
 	config   *config
-	nodes    *container.Dag[string, *NodeBox[T]]
+	nodes    *container.Dag[string, *nodeBox[T]]
 	executor IExecutor[T]
 }
 
@@ -43,7 +43,7 @@ func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
 
 	return &nodeEngine[T]{
 		config:   config,
-		nodes:    container.NewDag[string, *NodeBox[T]](name, flags...),
+		nodes:    container.NewDag[string, *nodeBox[T]](name, flags...),
 		executor: newNodeExecutor[T](),
 	}
 }
@@ -51,6 +51,51 @@ func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
 func (n *nodeEngine[T]) Prepare() error {
 	if n.nodes.IsChecked() {
 		return nil
+	}
+
+	// add conditional nodes
+	allNodes := n.nodes.GetAllVertices()
+	refNodes := make(map[string]*nodeBox[T], len(allNodes))
+	for _, node := range allNodes {
+		refNodes[node.BoxName] = node
+	}
+
+	for _, node := range allNodes {
+		if depNode, ok := node.Node.(IDependency[T, *Dependence[T]]); ok {
+			for _, v := range depNode.Dependence() {
+				if v == nil {
+					continue
+				}
+				underlineNode, exist := refNodes[v.DependenceName]
+				if !exist {
+					return fmt.Errorf(message(n.config.Language, nodeNotExist), v.DependenceName)
+				}
+				if v.Condition == nil {
+					n.nodes.AddEdge(node.BoxName, v.DependenceName)
+				} else {
+					condNode := &nodeBox[T]{
+						Node:       underlineNode.Node,
+						BoxName:    fmt.Sprintf("%v_by_%v", underlineNode.BoxName, node.Node.Name()),
+						Conditions: v.Condition,
+					}
+					n.nodes.AddVertex(condNode.BoxName, condNode)
+					for _, dep := range v.ConditionDependence {
+						if !contains(refNodes, dep) {
+							return fmt.Errorf(message(n.config.Language, nodeNotExist), dep)
+						}
+						n.nodes.AddEdge(condNode.BoxName, dep)
+					}
+					n.nodes.AddEdge(node.BoxName, condNode.BoxName)
+				}
+			}
+		} else if depNode, ok := node.Node.(IDependency[T, string]); ok {
+			for _, dep := range depNode.Dependence() {
+				if !contains(refNodes, dep) {
+					return fmt.Errorf(message(n.config.Language, nodeNotExist), dep)
+				}
+				n.nodes.AddEdge(node.BoxName, dep)
+			}
+		}
 	}
 
 	pass, cycles := n.nodes.CheckCycle()
