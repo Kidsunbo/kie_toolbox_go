@@ -18,14 +18,11 @@ type nodeEngine[T any] struct {
 // NewEngine creates a node engine that runs all the node.
 func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
 	config := &config{
-		Static:   false,
 		Language: chinese,
 	}
 	for _, param := range params {
 		if v, ok := param.(flag); ok {
-			if v == StaticNode {
-				config.Static = true
-			} else if v == ReportInChinese {
+			if v == ReportInChinese {
 				config.Language = chinese
 			} else if v == ReportInEnglish {
 				config.Language = english
@@ -34,9 +31,6 @@ func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
 	}
 
 	var flags []any
-	if config.Static {
-		flags = append(flags, container.DisableThreadSafe)
-	}
 	if config.Language == english {
 		flags = append(flags, container.EnglishError)
 	}

@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix: 
-        sub_module: [container, logs, cast]
+        sub_module: [container, logs, cast, kflow]
     steps:
     - uses: actions/checkout@v3
 

@@ -2,6 +2,7 @@ package kflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -36,22 +37,33 @@ func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[
 
 	tunnel := make(chan *ExecuteResult)
 	for {
-		var result []*ExecuteResult
-		stop, err := n.executeNodesInParallel(ctx, nodes, state, plan, tunnel, &result)
+		var results []*ExecuteResult
+		stop, err := n.executeNodesInParallel(ctx, nodes, state, plan, tunnel, &results)
 		if err != nil {
 			return err
 		}
 		if stop {
 			break
 		}
-		if result != nil {
-			// write the result
+		if len(results) != 0 {
+			for _, result := range results {
+				n.acceptOneResult(result, plan)
+			}
 		} else {
-			// wait for tunnel
+			select {
+			case result := <-tunnel:
+				n.acceptOneResult(result, plan)
+			case <-time.After(30 * time.Second):
+				return errors.New(message(plan.Config.Language, nodeTimeoutError))
+			}
 		}
 	}
 
 	return nil
+}
+
+func (n *nodeExecutor[T]) acceptOneResult(result *ExecuteResult, plan *Plan) {
+
 }
 
 func (n *nodeExecutor[T]) executeNodesInParallel(ctx context.Context, nodes *container.Dag[string, *nodeBox[T]], state T, plan *Plan, tunnel chan *ExecuteResult, out *[]*ExecuteResult) (bool, error) {
@@ -227,6 +239,7 @@ func (n *nodeExecutor[T]) hasFailedDependence(nodes *container.Dag[string, *node
 func (n *nodeExecutor[T]) asyncRunNode(ctx context.Context, batch []*nodeBox[T], state T, plan *Plan, tunnel chan *ExecuteResult) {
 	for _, node := range batch {
 		node := node
+		plan.RunningNodes[node.Node.Name()] = struct{}{}
 		backupResult := &ExecuteResult{
 			BoxName:       node.BoxName,
 			OriginalName:  node.Node.Name(),
