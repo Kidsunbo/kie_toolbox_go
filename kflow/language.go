@@ -20,6 +20,7 @@ const (
 	underlineNodeHasExecuted
 	conditionEvaludateToFalse
 	unsupportedNodeType
+	nodeTimeoutError
 )
 
 var msg = map[textIndexType]languagePack{
@@ -30,6 +31,7 @@ var msg = map[textIndexType]languagePack{
 	underlineNodeHasExecuted:  {Chinese: "底层节点[%v]已经执行完成", English: "underline node [%v] has already been executed"},
 	conditionEvaludateToFalse: {Chinese: "节点[%v]要求的条件不满足", English: "the condition result doesn't meet the requirement of node [%v]"},
 	unsupportedNodeType:       {Chinese: "节点[%v]的类型不支持", English: "the type of node [%v] isn't supported"},
+	nodeTimeoutError:          {Chinese: "节点运行超时", English: "node exeuctes timeout"},
 }
 
 func message(lang int8, text textIndexType) string {
