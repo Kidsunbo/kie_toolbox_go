@@ -35,7 +35,7 @@ type IFlowNode[T any] interface {
 type Condition[T any] func(context.Context, T) bool
 
 type IExecutor[T any] interface {
-	Execute(context.Context, *container.Dag[string, NodeBox[T]], T, *Plan) error
+	Execute(context.Context, *container.Dag[string, *NodeBox[T]], T, *Plan) error
 }
 
 type IBefore[T any] interface {
@@ -53,24 +53,27 @@ type Dependence[T any] struct {
 }
 
 type ExecuteResult struct {
-	NodeName          string    // the name of this node
-	Success           bool      // if this execution is successful, which means the run method does not return error
-	Err               error     // if the execution is failed, the error message
-	IsPanic           bool      // if the execution is panic. The panic will be recovered, user can use this field to detect if there is a panic
-	RunInParallel     bool      // if the node is running in parallel.
-	Skipped           bool      // if the node is skipped
-	SkippedReasonCode int64     // if the node is skipped, the reason code indicates the reason
-	StartTime         time.Time // when the node is started
-	TimeCost          int64     // the time cost for this node
-	ExecuteBy         string    // the name of specified node which passed with run method which execute the current node
+	BoxName       string    // the name of this NodeBox
+	OriginalName  string    // the name of the original node
+	Success       bool      // if this execution is successful, which means the run method does not return error
+	Err           error     // if the execution is failed, the error message
+	IsPanic       bool      // if the execution is panic. The panic will be recovered, user can use this field to detect if there is a panic
+	RunInParallel bool      // if the node is running in parallel.
+	Skipped       bool      // if the node is skipped
+	SkippedReason string    // if the node is skipped, this field indicates the reason
+	StartTime     time.Time // when the node is started
+	TimeCost      int64     // the time cost for this node
+	ExecuteBy     string    // the name of specified node which passed with run method which execute the current node
 }
 
 type Plan struct {
-	Config         *config                   // the config
-	SpecifiedNodes []string                  // the nodes specified by Run method in engine, when nil is passed in, all the nodes will be added into this field
-	CurrentNode    string                    // the node name which is running currently.
-	TargetNodes    map[string]struct{}       // the target nodes in this execution, normally, it's the same with SpecifiedNodes, but it can also be modified in flow nodes.
-	FinishNodes    map[string]*ExecuteResult // the finished nodes in this execution, it will contain all the nodes executed this time.
-	FailedNodes    map[string]struct{}       // the node reference to all the failed running node.
-	StartTime      time.Time                 // the start time for this plan
+	Config                *config                   // the config
+	ChainNodes            []string                  // the nodes specified by Run method in engine
+	CurrentNode           string                    // the node name which is running currently.
+	InParallel            bool                      // if nodes are running in parallel. This field can be used to check if it's safe to write the following fields
+	UnfinishedNodes       map[string]struct{}       // the unfinished nodes in this execution. The current chain node will be added and flow node can add new nodes to it dynamically. Key is BoxName.
+	FinishedNodes         map[string]*ExecuteResult // the finished nodes in this execution, it will contain all the nodes executed this time. Key is BoxName.
+	FailedNodes           map[string]struct{}       // the node reference to all the failed running node. Key is BoxName
+	FinishedOriginalNodes map[string]struct{}       // the FinishedNodes uses BoxName as its key. But different BoxName might has the same node, so it's convenient to maintain this field for filtering
+	StartTime             time.Time                 // the start time for this plan
 }

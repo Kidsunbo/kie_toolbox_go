@@ -11,7 +11,7 @@ import (
 
 type nodeEngine[T any] struct {
 	config   *config
-	nodes    *container.Dag[string, NodeBox[T]]
+	nodes    *container.Dag[string, *NodeBox[T]]
 	executor IExecutor[T]
 }
 
@@ -43,7 +43,7 @@ func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
 
 	return &nodeEngine[T]{
 		config:   config,
-		nodes:    container.NewDag[string, NodeBox[T]](name, flags...),
+		nodes:    container.NewDag[string, *NodeBox[T]](name, flags...),
 		executor: newNodeExecutor[T](),
 	}
 }
@@ -61,7 +61,9 @@ func (n *nodeEngine[T]) Prepare() error {
 	return nil
 }
 
-func (n *nodeEngine[T]) Run(ctx context.Context, state T, nodes ...string) error {
+// Run starts the engine and accept the state object. At least one node name needs to be passed in. If multiple nodes has been passed in, it will chain all them together.
+func (n *nodeEngine[T]) Run(ctx context.Context, state T, node string, rest ...string) error {
+	nodes := append([]string{node}, rest...)
 	if err := n.check(nodes); err != nil {
 		return err
 	}
@@ -78,10 +80,6 @@ func (n *nodeEngine[T]) check(nodes []string) error {
 		return errors.New(message(n.config.Language, notPreparedError))
 	}
 
-	if len(nodes) == 0 {
-		return errors.New(message(n.config.Language, nodeNotSpecified))
-	}
-
 	for _, node := range nodes {
 		if !n.nodes.HasVertex(node) {
 			return fmt.Errorf(message(n.config.Language, nodeNotExist), node)
@@ -96,19 +94,16 @@ func (n *nodeEngine[T]) execute(ctx context.Context, state T, nodes []string) er
 }
 
 func (n *nodeEngine[T]) makePlan(nodes []string) *Plan {
-	targets := make(map[string]struct{})
-	for _, node := range nodes {
-		targets[node] = struct{}{}
-	}
-
 	return &Plan{
-		Config:         n.config,
-		SpecifiedNodes: nodes,
-		CurrentNode:    "",
-		TargetNodes:    targets,
-		FinishNodes:    map[string]*ExecuteResult{},
-		FailedNodes:    map[string]struct{}{},
-		StartTime:      time.Now(),
+		Config:                n.config,
+		ChainNodes:            nodes,
+		CurrentNode:           "",
+		InParallel:            false,
+		UnfinishedNodes:       map[string]struct{}{},
+		FinishedNodes:         map[string]*ExecuteResult{},
+		FailedNodes:           map[string]struct{}{},
+		FinishedOriginalNodes: map[string]struct{}{},
+		StartTime:             time.Now(),
 	}
 }
 

@@ -19,7 +19,7 @@ func (n *Node[T]) StaticDependence(name string) *Dependence[T] {
 }
 
 type NodeBox[T any] struct {
-	node       INode[T]
-	boxName    string
-	conditions Condition[T]
+	Node       INode[T]
+	BoxName    string	// box name is the same with node.Name() if there is no condition. But if there is, the name will be <node.Name()>_by_<relying_node_name>。
+	Conditions Condition[T]
 }
