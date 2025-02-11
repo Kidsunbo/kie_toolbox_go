@@ -20,3 +20,8 @@ func safeRun(f func() error) (err error, isPanic bool) {
 	err = f()
 	return
 }
+
+func ofType[T any](value any) bool {
+	_, ok := value.(T)
+	return ok
+}
