@@ -71,7 +71,8 @@ type Plan struct {
 	ChainNodes            []string                  // the nodes specified by Run method in engine
 	CurrentNode           string                    // the node name which is running currently.
 	InParallel            bool                      // if nodes are running in parallel. This field can be used to check if it's safe to write the following fields
-	UnfinishedNodes       map[string]struct{}       // the unfinished nodes in this execution. The current chain node will be added and flow node can add new nodes to it dynamically. Key is BoxName.
+	TargetNodes           map[string]struct{}       // the target nodes in this execution. The current chain node will be added and flow node can add new nodes to it dynamically. Never remove nodes from it manually, it will be cleaned up at the right time. Key is BoxName.
+	RunningNodes          map[string]struct{}       // the nodes that are running at the moment
 	FinishedNodes         map[string]*ExecuteResult // the finished nodes in this execution, it will contain all the nodes executed this time. Key is BoxName.
 	FailedNodes           map[string]struct{}       // the node reference to all the failed running node. Key is BoxName
 	FinishedOriginalNodes map[string]struct{}       // the FinishedNodes uses BoxName as its key. But different BoxName might has the same node, so it's convenient to maintain this field for filtering
