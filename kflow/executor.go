@@ -47,12 +47,12 @@ func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[
 		}
 		if len(results) != 0 {
 			for _, result := range results {
-				n.acceptOneResult(result, plan)
+				n.saveResult(result, plan)
 			}
 		} else {
 			select {
 			case result := <-tunnel:
-				n.acceptOneResult(result, plan)
+				n.saveResult(result, plan)
 			case <-time.After(30 * time.Second):
 				return errors.New(message(plan.Config.Language, nodeTimeoutError))
 			}
@@ -62,8 +62,13 @@ func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[
 	return nil
 }
 
-func (n *nodeExecutor[T]) acceptOneResult(result *ExecuteResult, plan *Plan) {
-
+func (n *nodeExecutor[T]) saveResult(result *ExecuteResult, plan *Plan) {
+	plan.FinishedNodes[result.BoxName] = result
+	plan.FinishedOriginalNodes[result.OriginalName] = struct{}{}
+	delete(plan.RunningNodes, result.OriginalName)
+	if !result.Success {
+		plan.FailedNodes[result.BoxName] = struct{}{}
+	}
 }
 
 func (n *nodeExecutor[T]) executeNodesInParallel(ctx context.Context, nodes *container.Dag[string, *nodeBox[T]], state T, plan *Plan, tunnel chan *ExecuteResult, out *[]*ExecuteResult) (bool, error) {
@@ -102,17 +107,18 @@ func (n *nodeExecutor[T]) executeNodesInParallel(ctx context.Context, nodes *con
 		}
 	}
 
-	if len(batch) == 0 && len(plan.RunningNodes) == 0 {
+	if len(candidates) == 0 && len(plan.RunningNodes) == 0 {
 		return true, nil
 	}
 
-	// if there is only one node needs to be run, it will not start a new goroutine to provide thread-safe feature
+	// if there is only one node needs to be run and no other node running at the same time, it will not start a new goroutine to provide thread-safe feature
 	if len(batch) == 1 && len(plan.RunningNodes) == 0 {
 		plan.InParallel = false
 		node := batch[0]
 		result := n.runOneNode(ctx, node, state, plan)
 		*out = append(*out, result)
-	} else {
+	} else if len(batch) > 0 {
+		// if there is running nodes at the same time, run engine in async mode.
 		plan.InParallel = true
 		n.asyncRunNode(ctx, batch, state, plan, tunnel)
 	}
@@ -211,7 +217,7 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 		}
 		if !pass {
 			result.Success = true
-			result.Skipped = false
+			result.Skipped = true
 			result.SkippedReason = fmt.Sprintf(message(plan.Config.Language, conditionEvaludateToFalse), node.BoxName)
 			result.EndTime = time.Now()
 			return false, result, nil
