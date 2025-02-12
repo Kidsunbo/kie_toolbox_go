@@ -102,22 +102,16 @@ func (n *nodeEngine[T]) Prepare() error {
 
 // Run starts the engine and accept the state object. At least one node name needs to be passed in. If multiple nodes has been passed in, it will chain all them together.
 func (n *nodeEngine[T]) Run(ctx context.Context, state T, node string, rest ...string) error {
-	_, err := n.RunAndObserve(ctx, state, node, rest...)
-	return err
-}
-
-func (n *nodeEngine[T]) RunAndObserve(ctx context.Context, state T, node string, rest ...string) (*Plan, error) {
 	nodes := append([]string{node}, rest...)
 	if err := n.check(nodes); err != nil {
-		return nil, err
+		return err
 	}
 
-	plan := n.makePlan(nodes)
-	if err := n.execute(ctx, state, plan); err != nil {
-		return nil, err
+	if err := n.execute(ctx, state, nodes); err != nil {
+		return err
 	}
 
-	return plan, nil
+	return nil
 }
 
 func (n *nodeEngine[T]) check(nodes []string) error {
@@ -134,8 +128,8 @@ func (n *nodeEngine[T]) check(nodes []string) error {
 	return nil
 }
 
-func (n *nodeEngine[T]) execute(ctx context.Context, state T, plan *Plan) error {
-	return n.executor.Execute(ctx, n.nodes, state, plan)
+func (n *nodeEngine[T]) execute(ctx context.Context, state T, nodes []string) error {
+	return n.executor.Execute(ctx, n.nodes, state, n.makePlan(nodes))
 }
 
 func (n *nodeEngine[T]) makePlan(nodes []string) *Plan {
