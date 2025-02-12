@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Kidsunbo/kie_toolbox_go/container"
@@ -67,10 +68,12 @@ func (n *nodeEngine[T]) Prepare() error {
 				if v.Condition == nil {
 					n.nodes.AddEdge(node.BoxName, v.DependenceName)
 				} else {
+					nodeName := node.Node.Name()
 					condNode := &nodeBox[T]{
-						Node:       underlineNode.Node,
-						BoxName:    fmt.Sprintf("%v_by_%v", underlineNode.BoxName, node.Node.Name()),
-						Conditions: v.Condition,
+						Node:          underlineNode.Node,
+						BoxName:       fmt.Sprintf("%v_by_%v", underlineNode.BoxName, nodeName),
+						Condition:     v.Condition,
+						ConditionalBy: nodeName,
 					}
 					n.nodes.AddVertex(condNode.BoxName, condNode)
 					for _, dep := range v.ConditionDependence {
@@ -134,19 +137,70 @@ func (n *nodeEngine[T]) execute(ctx context.Context, state T, nodes []string) er
 
 func (n *nodeEngine[T]) makePlan(nodes []string) *Plan {
 	return &Plan{
-		Config:                n.config,
-		ChainNodes:            nodes,
-		CurrentNode:           "",
-		InParallel:            false,
-		TargetNodes:           make(map[string]struct{}),
-		RunningNodes:          make(map[string]struct{}, 3),
-		FinishedNodes:         make(map[string]*ExecuteResult, len(nodes)*5),
-		FailedNodes:           make(map[string]struct{}),
-		FinishedOriginalNodes: make(map[string]struct{}, len(nodes)*4),
-		StartTime:             time.Now(),
+		Config:                 n.config,
+		ChainNodes:             nodes,
+		CurrentNode:            "",
+		InParallel:             false,
+		RunningNodes:           make(map[string]struct{}, 3),
+		FinishedNodes:          make(map[string]*ExecuteResult, len(nodes)*5),
+		FailedNodes:            make(map[string]struct{}),
+		FinishedOriginalNodes:  make(map[string]struct{}, len(nodes)*4),
+		StartTime:              time.Now(),
+		ConditionalTargetNodes: make(map[string]struct{}),
+		TargetNodes:            make(map[string]struct{}),
 	}
 }
 
 func (n *nodeEngine[T]) MountExecutor(executor IExecutor[T]) {
 	n.executor = executor
+}
+
+func (n *nodeEngine[T]) Dot() string {
+	nodes := n.nodes.GetAllVertices()
+	edges := n.nodes.GetAllEdges()
+
+	const dependenceByCondition = 1
+	const conditionalDependence = 2
+	const normalDependence = 3
+
+	deps := make(map[string]map[string]int, len(nodes))
+	for _, node := range nodes {
+		deps[node.BoxName] = make(map[string]int)
+	}
+	for _, node := range nodes {
+		if node.Condition == nil {
+			for _, edge := range edges[node.BoxName] {
+				deps[node.BoxName][edge] = normalDependence
+			}
+		} else {
+			for _, edge := range edges[node.BoxName] {
+				deps[node.BoxName][edge] = dependenceByCondition
+			}
+			deps[node.BoxName][node.Node.Name()] = conditionalDependence
+		}
+	}
+
+	sb := strings.Builder{}
+	sb.WriteString("digraph G {\n")
+	for _, node := range nodes {
+		if node.Condition == nil {
+			sb.WriteString(fmt.Sprintf("  %v;\n", node.BoxName))
+		} else {
+			sb.WriteString(fmt.Sprintf("  %v [shape=diamond];\n", node.Node.Name()))
+		}
+	}
+	for from, dep := range deps {
+		for to, degree := range dep {
+			switch degree {
+			case normalDependence:
+				sb.WriteString(fmt.Sprintf("  %v -> %v;\n", from, to))
+			case conditionalDependence:
+				sb.WriteString(fmt.Sprintf("  %v -> %v [color=red];\n", from, to))
+			case dependenceByCondition:
+				sb.WriteString(fmt.Sprintf("  %v -> %v [color=blue];\n", from, to))
+			}
+		}
+	}
+	sb.WriteString("}\n")
+	return sb.String()
 }

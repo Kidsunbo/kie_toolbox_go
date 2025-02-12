@@ -8,8 +8,9 @@ func AddNode[T any](engine *nodeEngine[T], node INode) error {
 	}
 
 	return engine.nodes.AddVertex(node.Name(), &nodeBox[T]{
-		Node:       node,
-		BoxName:    node.Name(),
-		Conditions: nil,
+		Node:          node,
+		BoxName:       node.Name(),
+		Condition:     nil,
+		ConditionalBy: "",
 	})
 }

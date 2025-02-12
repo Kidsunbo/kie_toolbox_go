@@ -33,6 +33,7 @@ func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[
 	plan.TargetNodes[plan.CurrentNode] = struct{}{}
 	defer func() {
 		plan.TargetNodes = make(map[string]struct{})
+		plan.ConditionalTargetNodes = make(map[string]struct{})
 	}()
 
 	tunnel := make(chan *ExecuteResult)
@@ -49,7 +50,7 @@ func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[
 			for _, result := range results {
 				n.saveResult(result, plan)
 			}
-		} else {
+		} else if plan.InParallel {
 			select {
 			case result := <-tunnel:
 				n.saveResult(result, plan)
@@ -76,25 +77,46 @@ func (n *nodeExecutor[T]) executeNodesInParallel(ctx context.Context, nodes *con
 		return true, nil
 	}
 
-	target := make([]string, 0, len(plan.TargetNodes))
+	// decide the targets to be run this time
+	targetMap := make(map[string]struct{}, len(plan.TargetNodes)+len(plan.ConditionalTargetNodes))
 	for key := range plan.TargetNodes {
-		target = append(target, key)
+		targetMap[key] = struct{}{}
+	}
+	for key := range plan.ConditionalTargetNodes {
+		targetMap[key] = struct{}{}
+	}
+	targets := make([]string, 0, len(targetMap))
+	for key := range targetMap {
+		targets = append(targets, key)
 	}
 
+	// also decide which nodes have already done
 	alreadyDone := make([]string, 0, len(plan.FinishedNodes))
 	for key := range plan.FinishedNodes {
 		alreadyDone = append(alreadyDone, key)
 	}
 
-	candidates, err := nodes.NextBatch(target, container.AlreadyDone[string](alreadyDone), container.Reverse)
+	// get the next batch
+	candidates, err := nodes.NextBatch(targets, container.AlreadyDone[string](alreadyDone), container.Reverse)
 	if err != nil {
 		return false, err
 	}
 
+	fmt.Println(plan.ConditionalTargetNodes, plan.TargetNodes)
+	for _, can := range candidates {
+		fmt.Print(can.BoxName, " ")
+	}
+	fmt.Println()
+
+	// if there is nothing to run and nothing running, stop the execution
+	if len(candidates) == 0 && len(plan.RunningNodes) == 0 {
+		return true, nil
+	}
+
+	// filter the nodes that can be executed
 	batch := make([]*nodeBox[T], 0, len(candidates))
-	underline := make(map[string]struct{}, len(candidates))
 	for _, node := range candidates {
-		canRun, result, err := n.canRun(ctx, nodes, node, state, plan, underline)
+		canRun, result, err := n.canRun(ctx, nodes, node, state, plan)
 		if err != nil {
 			return false, err
 		}
@@ -107,8 +129,15 @@ func (n *nodeExecutor[T]) executeNodesInParallel(ctx context.Context, nodes *con
 		}
 	}
 
-	if len(candidates) == 0 && len(plan.RunningNodes) == 0 {
-		return true, nil
+	// if there is condition node, add the underline node to targets and recalculate the next batch
+	length := len(plan.ConditionalTargetNodes)
+	for _, node := range batch {
+		if node.Condition != nil {
+			plan.ConditionalTargetNodes[node.Node.Name()] = struct{}{}
+		}
+	}
+	if len(plan.ConditionalTargetNodes) != length {
+		return false, nil
 	}
 
 	// if there is only one node needs to be run and no other node running at the same time, it will not start a new goroutine to provide thread-safe feature
@@ -130,6 +159,7 @@ func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *nodeBox[T], stat
 	result := &ExecuteResult{
 		BoxName:       node.BoxName,
 		OriginalName:  node.Node.Name(),
+		Node:          node.Node,
 		RunInParallel: plan.InParallel,
 		StartTime:     time.Now(),
 		ExecuteBy:     plan.CurrentNode,
@@ -164,23 +194,29 @@ func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *nodeBox[T], stat
 	return result
 }
 
-func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[string, *nodeBox[T]], node *nodeBox[T], state T, plan *Plan, underline map[string]struct{}) (bool, *ExecuteResult, error) {
+func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[string, *nodeBox[T]], node *nodeBox[T], state T, plan *Plan) (bool, *ExecuteResult, error) {
 	originalName := node.Node.Name()
 	result := &ExecuteResult{
 		BoxName:       node.BoxName,
 		OriginalName:  originalName,
+		Node:          node.Node,
 		RunInParallel: plan.InParallel,
 		IsPanic:       false,
 		StartTime:     time.Now(),
 		ExecuteBy:     plan.CurrentNode,
 	}
-	// check if it's already done by other nodes with the same underline node.
+	// check if it has already executed by other nodes with the same underline node.
 	if contains(plan.FinishedOriginalNodes, originalName) {
 		result.Success = true
 		result.Skipped = true
 		result.SkippedReason = fmt.Sprintf(message(plan.Config.Language, underlineNodeHasExecuted), originalName)
 		result.EndTime = time.Now()
 		return false, result, nil
+	}
+
+	// check if its underline node is executing or about to execute, if it is, filter it out
+	if contains(plan.RunningNodes, originalName) || contains(plan.ConditionalTargetNodes, originalName) {
+		return false, nil, nil
 	}
 
 	// check if it has failed dependence
@@ -196,16 +232,11 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 		return false, result, nil
 	}
 
-	// check if there has been the same underline node in the batch, if there is, wait to next batch to filter out.
-	if contains(underline, originalName) {
-		return false, nil, nil
-	}
-
 	// check if it meet the condition
-	if node.Conditions != nil {
+	if node.Condition != nil {
 		var pass bool
 		err, isPanic := safeRun(func() error {
-			pass = node.Conditions(ctx, state)
+			pass = node.Condition(ctx, state)
 			return nil
 		})
 		if err != nil {
@@ -223,8 +254,6 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 			return false, result, nil
 		}
 	}
-
-	underline[originalName] = struct{}{}
 
 	return true, nil, nil
 }
@@ -249,6 +278,7 @@ func (n *nodeExecutor[T]) asyncRunNode(ctx context.Context, batch []*nodeBox[T],
 		backupResult := &ExecuteResult{
 			BoxName:       node.BoxName,
 			OriginalName:  node.Node.Name(),
+			Node:          node.Node,
 			RunInParallel: plan.InParallel,
 			StartTime:     time.Now(),
 			ExecuteBy:     plan.CurrentNode,
