@@ -115,6 +115,7 @@ func (m *MetaFlowNodeWithStructDependence) Run(ctx context.Context, state State,
 	return m.f(ctx, state, plan)
 }
 
+
 func TestAddNodes(t *testing.T) {
 	node := new(Node[State])
 
@@ -127,7 +128,7 @@ func TestAddNodes(t *testing.T) {
 	node6 := NewMetaFlowNodeWithStringDependence("B3", []string{}, func(ctx context.Context, state State, plan *Plan) error { fmt.Println("B1"); return nil })
 	node7 := NewMetaBasicNodeWithStructDependence("C1", nil, func(ctx context.Context, state State) error { fmt.Println("C1"); return nil })
 	node8 := NewMetaBasicNodeWithStructDependence("C2", []*Dependence[State]{node.StaticDependence("B3")}, func(ctx context.Context, state State) error { fmt.Println("C2"); return nil })
-	node9 := NewMetaBasicNodeWithStructDependence("C3", []*Dependence[State]{node.ConditionalDependence("B2", func(ctx context.Context, s State) bool { fmt.Println("Cond1"); return true }, []string{"A1"})}, func(ctx context.Context, state State) error { fmt.Println("C3"); return nil })
+	node9 := NewMetaBasicNodeWithStructDependence("C3", []*Dependence[State]{node.ConditionalDependence("B1", func(ctx context.Context, s State) bool { fmt.Println("Cond1"); return true }, []string{"A1"})}, func(ctx context.Context, state State) error { fmt.Println("C3"); return nil })
 	node10 := NewMetaBasicNodeWithStructDependence("C4", []*Dependence[State]{node.ConditionalDependence("B2", func(ctx context.Context, s State) bool { fmt.Println("Cond2"); return false }, []string{"A1"})}, func(ctx context.Context, state State) error { fmt.Println("C4"); return nil })
 
 
@@ -144,6 +145,12 @@ func TestAddNodes(t *testing.T) {
 
 	assert.NoError(t, eng.Prepare())
 
-	assert.NoError(t, eng.Run(context.Background(), State{}, "A1"))
+	// assert.NoError(t, eng.Run(context.Background(), State{}, "A1"))
+	// fmt.Println("===")
+	// assert.NoError(t, eng.Run(context.Background(), State{}, "C3"))
+	// fmt.Println("===")
+	// assert.NoError(t, eng.Run(context.Background(), State{}, "C4"))
+	// fmt.Println("===")
+	assert.NoError(t, eng.Run(context.Background(), State{}, "C4", "C3"))
 	fmt.Println(eng.nodes.Dot())
 }

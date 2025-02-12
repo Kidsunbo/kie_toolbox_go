@@ -102,16 +102,22 @@ func (n *nodeEngine[T]) Prepare() error {
 
 // Run starts the engine and accept the state object. At least one node name needs to be passed in. If multiple nodes has been passed in, it will chain all them together.
 func (n *nodeEngine[T]) Run(ctx context.Context, state T, node string, rest ...string) error {
+	_, err := n.RunAndObserve(ctx, state, node, rest...)
+	return err
+}
+
+func (n *nodeEngine[T]) RunAndObserve(ctx context.Context, state T, node string, rest ...string) (*Plan, error) {
 	nodes := append([]string{node}, rest...)
 	if err := n.check(nodes); err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := n.execute(ctx, state, nodes); err != nil {
-		return err
+	plan := n.makePlan(nodes)
+	if err := n.execute(ctx, state, plan); err != nil {
+		return nil, err
 	}
 
-	return nil
+	return plan, nil
 }
 
 func (n *nodeEngine[T]) check(nodes []string) error {
@@ -128,8 +134,8 @@ func (n *nodeEngine[T]) check(nodes []string) error {
 	return nil
 }
 
-func (n *nodeEngine[T]) execute(ctx context.Context, state T, nodes []string) error {
-	return n.executor.Execute(ctx, n.nodes, state, n.makePlan(nodes))
+func (n *nodeEngine[T]) execute(ctx context.Context, state T, plan *Plan) error {
+	return n.executor.Execute(ctx, n.nodes, state, plan)
 }
 
 func (n *nodeEngine[T]) makePlan(nodes []string) *Plan {
@@ -138,11 +144,11 @@ func (n *nodeEngine[T]) makePlan(nodes []string) *Plan {
 		ChainNodes:            nodes,
 		CurrentNode:           "",
 		InParallel:            false,
-		TargetNodes:           map[string]struct{}{},
-		RunningNodes:          map[string]struct{}{},
-		FinishedNodes:         map[string]*ExecuteResult{},
-		FailedNodes:           map[string]struct{}{},
-		FinishedOriginalNodes: map[string]struct{}{},
+		TargetNodes:           make(map[string]struct{}),
+		RunningNodes:          make(map[string]struct{}, 3),
+		FinishedNodes:         make(map[string]*ExecuteResult, len(nodes)*5),
+		FailedNodes:           make(map[string]struct{}),
+		FinishedOriginalNodes: make(map[string]struct{}, len(nodes)*4),
 		StartTime:             time.Now(),
 	}
 }
