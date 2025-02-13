@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -11,146 +12,132 @@ import (
 type State struct {
 }
 
-type MetaBasicNodeWithStringDependence struct {
-	name       string
+type BasicNode struct {
+	name string
+}
+
+func (b BasicNode) Name() string {
+	return b.name
+}
+
+func (b BasicNode) Run(ctx context.Context, state State) error {
+	time.Sleep(1 * time.Second)
+	fmt.Println(b.name)
+	return nil
+}
+
+type FlowNode struct {
+	name string
+}
+
+func (b FlowNode) Name() string {
+	return b.name
+}
+
+func (b FlowNode) Run(ctx context.Context, state State, plan *Plan) error {
+	time.Sleep(1 * time.Second)
+	fmt.Println(b.name, plan.InParallel())
+	return nil
+}
+
+type StringDependence struct {
 	dependence []string
-	f          func(ctx context.Context, state State) error
 }
 
-func (m *MetaBasicNodeWithStringDependence) Name() string {
-	return m.name
-}
-
-func (m *MetaBasicNodeWithStringDependence) Dependence() []string {
+func (m StringDependence) Dependence() []string {
 	return m.dependence
 }
 
-func (m *MetaBasicNodeWithStringDependence) Run(ctx context.Context, state State) error {
-	return m.f(ctx, state)
-}
-
-func NewMetaBasicNodeWithStringDependence(name string, dependence []string, f func(ctx context.Context, state State) error) *MetaBasicNodeWithStringDependence {
-	return &MetaBasicNodeWithStringDependence{
-		name:       name,
-		dependence: dependence,
-		f:          f,
-	}
-}
-
-type MetaFlowNodeWithStringDependence struct {
-	name       string
-	dependence []string
-	f          func(ctx context.Context, state State, plan *Plan) error
-}
-
-func NewMetaFlowNodeWithStringDependence(name string, dependence []string, f func(ctx context.Context, state State, plan *Plan) error) *MetaFlowNodeWithStringDependence {
-	return &MetaFlowNodeWithStringDependence{
-		name:       name,
-		dependence: dependence,
-		f:          f,
-	}
-}
-
-func (m *MetaFlowNodeWithStringDependence) Name() string {
-	return m.name
-}
-
-func (m *MetaFlowNodeWithStringDependence) Dependence() []string {
-	return m.dependence
-}
-
-func (m *MetaFlowNodeWithStringDependence) Run(ctx context.Context, state State, plan *Plan) error {
-	return m.f(ctx, state, plan)
-}
-
-type MetaBasicNodeWithStructDependence struct {
-	name       string
+type ConditionDependence struct {
 	dependence []*Dependence[State]
-	f          func(ctx context.Context, state State) error
 }
 
-func NewMetaBasicNodeWithStructDependence(name string, dependence []*Dependence[State], f func(ctx context.Context, state State) error) *MetaBasicNodeWithStructDependence {
-	return &MetaBasicNodeWithStructDependence{
-		name:       name,
-		dependence: dependence,
-		f:          f,
-	}
-}
-
-func (m *MetaBasicNodeWithStructDependence) Name() string {
-	return m.name
-}
-
-func (m *MetaBasicNodeWithStructDependence) Dependence() []*Dependence[State] {
+func (m ConditionDependence) Dependence() []*Dependence[State] {
 	return m.dependence
 }
 
-func (m *MetaBasicNodeWithStructDependence) Run(ctx context.Context, state State) error {
-	return m.f(ctx, state)
+type NodeType1 struct {
+	BasicNode
+	StringDependence
 }
 
-type MetaFlowNodeWithStructDependence struct {
-	name       string
-	dependence []*Dependence[State]
-	f          func(ctx context.Context, state State, plan *Plan) error
-}
-
-func NewMetaFlowNodeWithStructDependence(name string, dependence []*Dependence[State], f func(ctx context.Context, state State, plan *Plan) error) *MetaFlowNodeWithStructDependence {
-	return &MetaFlowNodeWithStructDependence{
-		name:       name,
-		dependence: dependence,
-		f:          f,
+func NewNodeType1(name string, dep []string) *NodeType1 {
+	return &NodeType1{
+		BasicNode: BasicNode{
+			name: name,
+		},
+		StringDependence: StringDependence{
+			dependence: dep,
+		},
 	}
 }
 
-func (m *MetaFlowNodeWithStructDependence) Name() string {
-	return m.name
+type NodeType2 struct {
+	BasicNode
+	ConditionDependence
 }
 
-func (m *MetaFlowNodeWithStructDependence) Dependence() []*Dependence[State] {
-	return m.dependence
+func NewNodeType2(name string, dep []*Dependence[State]) *NodeType2 {
+	return &NodeType2{
+		BasicNode: BasicNode{
+			name: name,
+		},
+		ConditionDependence: ConditionDependence{
+			dependence: dep,
+		},
+	}
 }
 
-func (m *MetaFlowNodeWithStructDependence) Run(ctx context.Context, state State, plan *Plan) error {
-	return m.f(ctx, state, plan)
+type NodeType3 struct {
+	FlowNode
+	StringDependence
 }
 
+func NewNodeType3(name string, dep []string) *NodeType3 {
+	return &NodeType3{
+		FlowNode: FlowNode{
+			name: name,
+		},
+		StringDependence: StringDependence{
+			dependence: dep,
+		},
+	}
+}
+
+type NodeType4 struct {
+	FlowNode
+	ConditionDependence
+}
+
+func NewNodeType4(name string, dep []*Dependence[State]) *NodeType4 {
+	return &NodeType4{
+		FlowNode: FlowNode{
+			name: name,
+		},
+		ConditionDependence: ConditionDependence{
+			dependence: dep,
+		},
+	}
+}
 
 func TestAddNodes(t *testing.T) {
 	node := new(Node[State])
 
 	eng := NewEngine[State]("")
-	node1 := NewMetaBasicNodeWithStringDependence("A1", nil, func(ctx context.Context, state State) error { fmt.Println("A1"); return nil })
-	node2 := NewMetaBasicNodeWithStringDependence("A2", nil, func(ctx context.Context, state State) error { fmt.Println("A2"); return nil })
-	node3 := NewMetaBasicNodeWithStringDependence("A3", []string{"A1", "A2"}, func(ctx context.Context, state State) error { fmt.Println("A3"); return nil })
-	node4 := NewMetaFlowNodeWithStringDependence("B1", []string{"A1"}, func(ctx context.Context, state State, plan *Plan) error { fmt.Println("B1", plan.CurrentNode); return nil })
-	node5 := NewMetaFlowNodeWithStringDependence("B2", []string{"A2"}, func(ctx context.Context, state State, plan *Plan) error { fmt.Println("B2", plan.CurrentNode); return nil })
-	node6 := NewMetaFlowNodeWithStringDependence("B3", []string{}, func(ctx context.Context, state State, plan *Plan) error { fmt.Println("B3", plan.CurrentNode); return nil })
-	node7 := NewMetaBasicNodeWithStructDependence("C1", nil, func(ctx context.Context, state State) error { fmt.Println("C1"); return nil })
-	node8 := NewMetaBasicNodeWithStructDependence("C2", []*Dependence[State]{node.StaticDependence("B3")}, func(ctx context.Context, state State) error { fmt.Println("C2"); return nil })
-	node9 := NewMetaBasicNodeWithStructDependence("C3", []*Dependence[State]{node.ConditionalDependence("B1", func(ctx context.Context, s State) bool { fmt.Println("Cond1"); return true }, []string{"A1"})}, func(ctx context.Context, state State) error { fmt.Println("C3"); return nil })
-	node10 := NewMetaBasicNodeWithStructDependence("C4", []*Dependence[State]{node.ConditionalDependence("B2", func(ctx context.Context, s State) bool { fmt.Println("Cond2"); return false }, []string{"A1"})}, func(ctx context.Context, state State) error { fmt.Println("C4"); return nil })
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", []string{"Type1_1"})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", []string{"Type1_1"})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_1"})))
 
-
-	assert.NoError(t, AddNode(eng, node1))
-	assert.NoError(t, AddNode(eng, node2))
-	assert.NoError(t, AddNode(eng, node3))
-	assert.NoError(t, AddNode(eng, node4))
-	assert.NoError(t, AddNode(eng, node5))
-	assert.NoError(t, AddNode(eng, node6))
-	assert.NoError(t, AddNode(eng, node7))
-	assert.NoError(t, AddNode(eng, node8))
-	assert.NoError(t, AddNode(eng, node9))
-	assert.NoError(t, AddNode(eng, node10))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependence[State]{
+		node.StaticDependence("Type1_3"), node.ConditionalDependence("Type1_1", func(ctx context.Context, s State) bool { return false }, []string{"Type1_2"}),
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_2", []*Dependence[State]{
+		node.StaticDependence("Type1_2"), node.ConditionalDependence("Type2_1", func(ctx context.Context, s State) bool { return true }, []string{"Type1_2", "Type1_4"}),
+	})))
 
 	assert.NoError(t, eng.Prepare())
 
-	// assert.NoError(t, eng.Run(context.Background(), State{}, "A1"))
-	// fmt.Println("===")
-	// assert.NoError(t, eng.Run(context.Background(), State{}, "C3"))
-	// fmt.Println("===")
-	// assert.NoError(t, eng.Run(context.Background(), State{}, "C4"))
-	// fmt.Println("===")
-	// assert.NoError(t, eng.Run(context.Background(), State{}, "C4", "C3"))
+	assert.NoError(t, eng.Run(context.Background(), State{}, "Type2_2"))
 	fmt.Println(eng.Dot())
 }

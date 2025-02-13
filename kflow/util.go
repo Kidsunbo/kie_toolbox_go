@@ -25,3 +25,19 @@ func ofType[T any](value any) bool {
 	_, ok := value.(T)
 	return ok
 }
+
+func keys[K comparable, T any](m map[K]T) []K {
+	result := make([]K, 0, len(m))
+	for key := range m {
+		result = append(result, key)
+	}
+	return result
+}
+
+func values[K comparable, T any](m map[K]T) []T {
+	result := make([]T, 0, len(m))
+	for _, value := range m {
+		result = append(result, value)
+	}
+	return result
+}
