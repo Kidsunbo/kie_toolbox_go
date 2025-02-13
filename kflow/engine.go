@@ -66,7 +66,10 @@ func (n *nodeEngine[T]) Prepare() error {
 					return fmt.Errorf(message(n.config.Language, nodeNotExist), v.DependenceName)
 				}
 				if v.Condition == nil {
-					n.nodes.AddEdge(node.BoxName, v.DependenceName)
+					err := n.nodes.AddEdge(node.BoxName, v.DependenceName)
+					if err != nil {
+						return err
+					}
 				} else {
 					nodeName := node.Node.Name()
 					condNode := &nodeBox[T]{
@@ -75,14 +78,23 @@ func (n *nodeEngine[T]) Prepare() error {
 						Condition:     v.Condition,
 						ConditionalBy: nodeName,
 					}
-					n.nodes.AddVertex(condNode.BoxName, condNode)
+					err := n.nodes.AddVertex(condNode.BoxName, condNode)
+					if err != nil {
+						return err
+					}
 					for _, dep := range v.ConditionDependence {
 						if !contains(refNodes, dep) {
 							return fmt.Errorf(message(n.config.Language, nodeNotExist), dep)
 						}
-						n.nodes.AddEdge(condNode.BoxName, dep)
+						err := n.nodes.AddEdge(condNode.BoxName, dep)
+						if err != nil {
+							return err
+						}
 					}
-					n.nodes.AddEdge(node.BoxName, condNode.BoxName)
+					err = n.nodes.AddEdge(node.BoxName, condNode.BoxName)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		} else if depNode, ok := node.Node.(IDependency[T, string]); ok {
@@ -90,7 +102,10 @@ func (n *nodeEngine[T]) Prepare() error {
 				if !contains(refNodes, dep) {
 					return fmt.Errorf(message(n.config.Language, nodeNotExist), dep)
 				}
-				n.nodes.AddEdge(node.BoxName, dep)
+				err := n.nodes.AddEdge(node.BoxName, dep)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -137,17 +152,18 @@ func (n *nodeEngine[T]) execute(ctx context.Context, state T, nodes []string) er
 
 func (n *nodeEngine[T]) makePlan(nodes []string) *Plan {
 	return &Plan{
-		Config:                 n.config,
-		ChainNodes:             nodes,
-		CurrentNode:            "",
-		InParallel:             false,
-		RunningNodes:           make(map[string]struct{}, 3),
-		FinishedNodes:          make(map[string]*ExecuteResult, len(nodes)*5),
-		FailedNodes:            make(map[string]struct{}),
-		FinishedOriginalNodes:  make(map[string]struct{}, len(nodes)*4),
-		StartTime:              time.Now(),
-		ConditionalTargetNodes: make(map[string]struct{}),
-		TargetNodes:            make(map[string]struct{}),
+		config:                 n.config,
+		chainNodes:             nodes,
+		failedNodes:            make(map[string]struct{}),
+		finishedOriginalNodes:  make(map[string]struct{}, len(nodes)*4),
+		conditionalTargetNodes: make(map[string]struct{}),
+		startTime:              time.Now(),
+		finishedNodes:          make(map[string]*ExecuteResult, len(nodes)*5),
+		runningNodes:           make(map[string]struct{}, 3),
+		inParallel:             false,
+		currentNode:            "",
+		targetsSummary:         []string{},
+		targetNodes:            make(map[string]struct{}),
 	}
 }
 
@@ -186,7 +202,7 @@ func (n *nodeEngine[T]) Dot() string {
 		if node.Condition == nil {
 			sb.WriteString(fmt.Sprintf("  %v;\n", node.BoxName))
 		} else {
-			sb.WriteString(fmt.Sprintf("  %v [shape=diamond];\n", node.Node.Name()))
+			sb.WriteString(fmt.Sprintf("  %v [shape=diamond];\n", node.BoxName))
 		}
 	}
 	for from, dep := range deps {
