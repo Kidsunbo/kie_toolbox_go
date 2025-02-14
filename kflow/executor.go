@@ -141,13 +141,13 @@ func (n *nodeExecutor[T]) executeNodesInParallel(ctx context.Context, nodes *con
 
 	// if there is only one node needs to be run and no other node running at the same time, it will not start a new goroutine to provide thread-safe feature
 	if len(batch) == 1 && len(plan.runningNodes) == 0 {
-		plan.inParallel = false
+		plan.inParallel.Store(false)
 		node := batch[0]
 		result := n.runOneNode(ctx, node, state, plan)
 		*out = append(*out, result)
 	} else if len(batch) > 0 {
 		// if there is running nodes at the same time, run engine in async mode.
-		plan.inParallel = true
+		plan.inParallel.Store(true)
 		n.asyncRunNode(ctx, batch, state, plan, tunnel)
 	}
 
@@ -159,7 +159,7 @@ func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *nodeBox[T], stat
 		BoxName:       node.BoxName,
 		OriginalName:  node.Node.Name(),
 		Node:          node.Node,
-		RunInParallel: plan.inParallel,
+		RunInParallel: plan.inParallel.Load(),
 		StartTime:     time.Now(),
 		ExecuteBy:     plan.currentNode,
 	}
@@ -199,7 +199,7 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 		BoxName:       node.BoxName,
 		OriginalName:  originalName,
 		Node:          node.Node,
-		RunInParallel: plan.inParallel,
+		RunInParallel: plan.inParallel.Load(),
 		IsPanic:       false,
 		StartTime:     time.Now(),
 		ExecuteBy:     plan.currentNode,
@@ -282,7 +282,7 @@ func (n *nodeExecutor[T]) asyncRunNode(ctx context.Context, batch []*nodeBox[T],
 			BoxName:       node.BoxName,
 			OriginalName:  node.Node.Name(),
 			Node:          node.Node,
-			RunInParallel: plan.inParallel,
+			RunInParallel: plan.inParallel.Load(),
 			StartTime:     time.Now(),
 			ExecuteBy:     plan.currentNode,
 		}
