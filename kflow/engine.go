@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Kidsunbo/kie_toolbox_go/container"
@@ -160,7 +161,7 @@ func (n *nodeEngine[T]) makePlan(nodes []string) *Plan {
 		startTime:              time.Now(),
 		finishedNodes:          make(map[string]*ExecuteResult, len(nodes)*5),
 		runningNodes:           make(map[string]struct{}, 3),
-		inParallel:             false,
+		inParallel:             atomic.Bool{},
 		currentNode:            "",
 		targetsSummary:         []string{},
 		targetNodes:            make(map[string]struct{}),

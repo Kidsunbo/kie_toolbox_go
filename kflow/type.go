@@ -3,6 +3,7 @@ package kflow
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/Kidsunbo/kie_toolbox_go/container"
@@ -84,7 +85,7 @@ type Plan struct {
 	startTime              time.Time                 // The start time for this plan
 	finishedNodes          map[string]*ExecuteResult // The finished nodes in this execution, it will contain all the nodes executed this time. Key is BoxName.
 	runningNodes           map[string]struct{}       // The nodes that are running at the moment. Key is OriginalName
-	inParallel             bool                      // If nodes are running in parallel. This field can be used to check if it's safe to write the following fields
+	inParallel             atomic.Bool               // If nodes are running in parallel. This field can be used to check if it's safe to write the following fields
 	currentNode            string                    // The node name which is running currently.
 	targetsSummary         []string                  // The nodes name contains conditionalTargetNodes and targetNodes. It's here for performance purpose.
 	targetNodes            map[string]struct{}       // The target nodes in this execution. The current chain node will be added and flow node can add new nodes to it dynamically. Never remove nodes from it manually, it will be cleaned up at the right time. Key is BoxName.
@@ -92,7 +93,7 @@ type Plan struct {
 
 // GetTargetNodes gets the current target nodes. There is no chance to read and write in parallel, so parallel checking is not necessary.
 func (p *Plan) GetTargetNodes() ([]string, error) {
-	if p.inParallel {
+	if p.inParallel.Load() {
 		return nil, errors.New(message(p.config.Language, operationNotSupportedInParallel))
 	}
 	return keys(p.targetNodes), nil
@@ -100,7 +101,7 @@ func (p *Plan) GetTargetNodes() ([]string, error) {
 
 // AddTargetNode adds node to the target dynamically.
 func (p *Plan) AddTargetNode(node string) error {
-	if p.inParallel {
+	if p.inParallel.Load() {
 		return errors.New(message(p.config.Language, operationNotSupportedInParallel))
 	}
 	p.targetNodes[node] = struct{}{}
@@ -109,12 +110,12 @@ func (p *Plan) AddTargetNode(node string) error {
 
 // InParallel shows that if the nodes are running in parallel. You can use this method to check if you can add node to targets safely.
 func (p *Plan) InParallel() bool {
-	return p.inParallel
+	return p.inParallel.Load()
 }
 
 // GetExecuteResult return the executing result
 func (p *Plan) GetExecuteResult() ([]*ExecuteResult, error) {
-	if p.inParallel {
+	if p.inParallel.Load() {
 		return nil, errors.New(message(p.config.Language, operationNotSupportedInParallel))
 	}
 	return values(p.finishedNodes), nil
