@@ -3,6 +3,7 @@ package kflow
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -583,7 +584,8 @@ func TestAddNodesDynamically(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
 
 	assert.NoError(t, eng.Prepare())
-	// fmt.Println(eng.Dot())
+	assert.NoError(t, eng.Prepare())
+	fmt.Println(eng.Dot())
 	assert.NoError(t, eng.Run(context.Background(), state, "TypeAddNode_1", "PlanExtractor"))
 	results, err := plan.GetExecuteResult()
 	assert.NoError(t, err)
