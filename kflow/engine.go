@@ -20,7 +20,9 @@ type nodeEngine[T any] struct {
 // NewEngine creates a node engine that runs all the node.
 func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
 	config := &config{
+		Name:     name,
 		Language: chinese,
+		Timeout:  30,
 	}
 	for _, param := range params {
 		if v, ok := param.(flag); ok {
@@ -29,6 +31,8 @@ func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
 			} else if v == ReportInEnglish {
 				config.Language = english
 			}
+		} else if v, ok := param.(AsyncTimeout); ok {
+			config.Timeout = time.Duration(v)
 		}
 	}
 
@@ -44,6 +48,7 @@ func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
 	}
 }
 
+// Prepare will compile the graph and anylize the dependence. It will also check and report the cyclic.
 func (n *nodeEngine[T]) Prepare() error {
 	if n.nodes.IsChecked() {
 		return nil
@@ -56,6 +61,7 @@ func (n *nodeEngine[T]) Prepare() error {
 		refNodes[node.BoxName] = node
 	}
 
+	originalEdge := make(map[string]string)
 	for _, node := range allNodes {
 		if depNode, ok := node.Node.(IDependency[T, *Dependence[T]]); ok {
 			for _, v := range depNode.Dependence() {
@@ -73,13 +79,24 @@ func (n *nodeEngine[T]) Prepare() error {
 					}
 				} else {
 					nodeName := node.Node.Name()
+					boxName := fmt.Sprintf("%v_by_%v", underlineNode.BoxName, nodeName)
+					if n.nodes.HasVertex(boxName) {
+						continue
+					}
 					condNode := &nodeBox[T]{
 						Node:          underlineNode.Node,
-						BoxName:       fmt.Sprintf("%v_by_%v", underlineNode.BoxName, nodeName),
+						BoxName:       boxName,
 						Condition:     v.Condition,
 						ConditionalBy: nodeName,
 					}
 					err := n.nodes.AddVertex(condNode.BoxName, condNode)
+					if err != nil {
+						return err
+					}
+
+					// temporarily add edge between condition node and origin node for cycle checking, it will be removed after checking.
+					originalEdge[condNode.BoxName] = underlineNode.BoxName
+					err = n.nodes.AddEdge(condNode.BoxName, underlineNode.BoxName)
 					if err != nil {
 						return err
 					}
@@ -112,6 +129,17 @@ func (n *nodeEngine[T]) Prepare() error {
 	}
 
 	pass, cycles := n.nodes.CheckCycle()
+	if !pass {
+		return fmt.Errorf(message(n.config.Language, cycleDetectedError), cycles)
+	}
+
+	for k, v := range originalEdge {
+		err := n.nodes.RemoveEdge(k, v)
+		if err != nil {
+			return err
+		}
+	}
+	pass, cycles = n.nodes.CheckCycle()
 	if !pass {
 		return fmt.Errorf(message(n.config.Language, cycleDetectedError), cycles)
 	}

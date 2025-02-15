@@ -25,7 +25,7 @@ const (
 )
 
 var msg = map[textIndexType]languagePack{
-	cycleDetectedError:              {Chinese: "监测到环存在, %v", English: "cycles detected, %v"},
+	cycleDetectedError:              {Chinese: "检测到环存在, %v", English: "cycles detected, %v"},
 	notPreparedError:                {Chinese: "调用前未准备, 请先调用Prepare方法", English: "Not prepare before run, please call Prepare method before"},
 	nodeNotExist:                    {Chinese: "节点[%v]不存在", English: "node [%v] does not exist"},
 	nodeHasFailedDependence:         {Chinese: "节点[%v]存在执行失败的依赖节点[%v]", English: "node [%v] has failed dependent node [%v]"},
