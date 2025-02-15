@@ -91,6 +91,10 @@ type Plan struct {
 	targetNodes            map[string]struct{}       // The target nodes in this execution. The current chain node will be added and flow node can add new nodes to it dynamically. Never remove nodes from it manually, it will be cleaned up at the right time. Key is BoxName.
 }
 
+func (p *Plan) GetConfig() *config {
+	return p.config
+}
+
 // GetTargetNodes gets the current target nodes. There is no chance to read and write in parallel, so parallel checking is not necessary.
 func (p *Plan) GetTargetNodes() ([]string, error) {
 	if p.inParallel.Load() {
@@ -105,6 +109,7 @@ func (p *Plan) AddTargetNode(node string) error {
 		return errors.New(message(p.config.Language, operationNotSupportedInParallel))
 	}
 	p.targetNodes[node] = struct{}{}
+	p.targetsSummary = nil
 	return nil
 }
 

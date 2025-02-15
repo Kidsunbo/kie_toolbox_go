@@ -55,7 +55,7 @@ func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[
 			select {
 			case result := <-tunnel:
 				n.saveResult(result, plan)
-			case <-time.After(30 * time.Second):
+			case <-time.After(plan.config.Timeout * time.Second):
 				return errors.New(message(plan.config.Language, nodeTimeoutError))
 			}
 		}
