@@ -253,6 +253,43 @@ func NewNodeAddNodeType(name string, dep []string, nodes []string) *NodeAddNodeT
 	}
 }
 
+type NodePlanOperatorType struct {
+	FlowNode
+	StringDependence
+	t *testing.T
+}
+
+func (n *NodePlanOperatorType) Run(ctx context.Context, state *State, plan *Plan) error {
+	state.Lock.Lock()
+	defer state.Lock.Unlock()
+	state.Stamps = append(state.Stamps, n.name)
+	state.ConcurrentInfo = append(state.ConcurrentInfo, plan.InParallel())
+
+	t := n.t
+	assert.NotNil(t, plan.GetConfig())
+	assert.NotEmpty(t, plan.GetCurrentNode())
+	_, err := plan.GetExecuteResult()
+	assert.Error(t, err)
+	_, err = plan.GetTargetNodes()
+	assert.Error(t, err)
+	err = plan.AddTargetNode("Type_2")
+	assert.Error(t, err)
+
+	return nil
+}
+
+func NewNodePlanOperatorType(name string, dep []string, t *testing.T) *NodePlanOperatorType {
+	return &NodePlanOperatorType{
+		FlowNode: FlowNode{
+			name: name,
+		},
+		StringDependence: StringDependence{
+			dependence: dep,
+		},
+		t: t,
+	}
+}
+
 func TestNormalNodeGraph1(t *testing.T) {
 	node := new(Node[*State])
 
@@ -593,5 +630,26 @@ func TestAddNodesDynamically(t *testing.T) {
 	assert.ElementsMatch(t, []string{"TypeAddNode_1", "Type1_1", "Type1_2", "Type1_3", "Type1_4", "Type1_5", "Type1_7", "Type1_8", "PlanExtractor"}, state.Stamps)
 	assert.Equal(t, []bool{false, false}, state.ConcurrentInfo[0:2])
 	assert.False(t, state.ConcurrentInfo[8])
+
+}
+
+func TestParallelFlowNode(t *testing.T) {
+	var plan *Plan
+
+	state := new(State)
+	eng := NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_1", []string{
+		"Operator1_1", 
+		"Operator1_2", 
+		"Operator1_3",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePlanOperatorType("Operator1_1", nil, t)))
+	assert.NoError(t, AddNode(eng, NewNodePlanOperatorType("Operator1_2", nil, t)))
+	assert.NoError(t, AddNode(eng, NewNodePlanOperatorType("Operator1_3", nil, t)))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+
+	assert.NoError(t, eng.Prepare())
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "PlanExtractor"))
 
 }
