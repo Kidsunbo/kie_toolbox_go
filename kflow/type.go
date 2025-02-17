@@ -47,14 +47,6 @@ type IExecutor[T any] interface {
 	Execute(context.Context, *container.Dag[string, *nodeBox[T]], T, *Plan) error
 }
 
-type IBefore[T any] interface {
-	Before(context.Context, T)
-}
-
-type IAfter[T any] interface {
-	After(context.Context, T)
-}
-
 type Dependence[T any] struct {
 	DependenceName      string
 	Condition           Condition[T]
