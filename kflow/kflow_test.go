@@ -595,6 +595,9 @@ func TestTimeoutAndError(t *testing.T) {
 	assert.Equal(t, "Type2_1", plan.finishedNodes["TypePanic_1"].ExecuteBy)
 	assert.Equal(t, "Type2_1", plan.finishedNodes["Type2_1"].ExecuteBy)
 	assert.Equal(t, "PlanExtractor", plan.finishedNodes["PlanExtractor"].ExecuteBy)
+
+	chain := plan.GetChainNodes()
+	assert.Equal(t, []string{"Type2_1", "PlanExtractor"}, chain)
 }
 
 func TestAddNodesDynamically(t *testing.T) {

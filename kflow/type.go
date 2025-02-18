@@ -123,6 +123,11 @@ func (p *Plan) GetCurrentNode() string {
 	return p.currentNode
 }
 
+// GetChainNodes returns all the nodes in the chain. It's useful to draw a flow 
+func (p *Plan) GetChainNodes() []string {
+	return p.chainNodes
+}
+
 // GetStartTime gets the start time of the process.
 func (p *Plan) GetStartTime() time.Time {
 	return p.startTime
