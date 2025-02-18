@@ -11,14 +11,14 @@ import (
 	"github.com/Kidsunbo/kie_toolbox_go/container"
 )
 
-type nodeEngine[T any] struct {
+type Engine[T any] struct {
 	config   *config
 	nodes    *container.Dag[string, *nodeBox[T]]
 	executor IExecutor[T]
 }
 
 // NewEngine creates a node engine that runs all the node.
-func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
+func NewEngine[T any](name string, params ...any) *Engine[T] {
 	config := &config{
 		Name:     name,
 		Language: chinese,
@@ -41,7 +41,7 @@ func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
 		flags = append(flags, container.EnglishError)
 	}
 
-	return &nodeEngine[T]{
+	return &Engine[T]{
 		config:   config,
 		nodes:    container.NewDag[string, *nodeBox[T]](name, flags...),
 		executor: newNodeExecutor[T](),
@@ -49,7 +49,7 @@ func NewEngine[T any](name string, params ...any) *nodeEngine[T] {
 }
 
 // Prepare will compile the graph and anylize the dependence. It will also check and report the cyclic.
-func (n *nodeEngine[T]) Prepare() error {
+func (n *Engine[T]) Prepare() error {
 	if n.nodes.IsChecked() {
 		return nil
 	}
@@ -148,7 +148,7 @@ func (n *nodeEngine[T]) Prepare() error {
 }
 
 // Run starts the engine and accept the state object. At least one node name needs to be passed in. If multiple nodes has been passed in, it will chain all them together.
-func (n *nodeEngine[T]) Run(ctx context.Context, state T, node string, rest ...string) error {
+func (n *Engine[T]) Run(ctx context.Context, state T, node string, rest ...string) error {
 	nodes := append([]string{node}, rest...)
 	if err := n.check(nodes); err != nil {
 		return err
@@ -161,7 +161,7 @@ func (n *nodeEngine[T]) Run(ctx context.Context, state T, node string, rest ...s
 	return nil
 }
 
-func (n *nodeEngine[T]) check(nodes []string) error {
+func (n *Engine[T]) check(nodes []string) error {
 	if !n.nodes.IsChecked() {
 		return errors.New(message(n.config.Language, notPreparedError))
 	}
@@ -175,11 +175,11 @@ func (n *nodeEngine[T]) check(nodes []string) error {
 	return nil
 }
 
-func (n *nodeEngine[T]) execute(ctx context.Context, state T, nodes []string) error {
+func (n *Engine[T]) execute(ctx context.Context, state T, nodes []string) error {
 	return n.executor.Execute(ctx, n.nodes, state, n.makePlan(nodes))
 }
 
-func (n *nodeEngine[T]) makePlan(nodes []string) *Plan {
+func (n *Engine[T]) makePlan(nodes []string) *Plan {
 	return &Plan{
 		config:                 n.config,
 		chainNodes:             nodes,
@@ -196,11 +196,11 @@ func (n *nodeEngine[T]) makePlan(nodes []string) *Plan {
 	}
 }
 
-func (n *nodeEngine[T]) MountExecutor(executor IExecutor[T]) {
+func (n *Engine[T]) MountExecutor(executor IExecutor[T]) {
 	n.executor = executor
 }
 
-func (n *nodeEngine[T]) Dot() string {
+func (n *Engine[T]) Dot() string {
 	nodes := n.nodes.GetAllVertices()
 	edges := n.nodes.GetAllEdges()
 
