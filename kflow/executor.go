@@ -197,19 +197,20 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 	originalName := node.Node.Name()
 	// check if it has already executed by other nodes with the same underline node.
 	if contains(plan.finishedOriginalNodes, originalName) {
+		now := time.Now()
 		result := &ExecuteResult{
 			BoxName:       node.BoxName,
 			OriginalName:  originalName,
 			Node:          node.Node,
 			RunInParallel: plan.inParallel.Load(),
 			IsPanic:       false,
-			StartTime:     time.Now(),
+			Skipped:       true,
+			Success:       true,
+			SkippedReason: fmt.Sprintf(message(plan.config.Language, underlineNodeHasExecuted), originalName),
+			StartTime:     now,
+			EndTime:       now,
 			ExecuteBy:     plan.currentNode,
 		}
-		result.Success = true
-		result.Skipped = true
-		result.SkippedReason = fmt.Sprintf(message(plan.config.Language, underlineNodeHasExecuted), originalName)
-		result.EndTime = time.Now()
 		return false, result, nil
 	}
 
@@ -224,19 +225,20 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 		return false, nil, err
 	}
 	if hasFailedDependence {
+		now := time.Now()
 		result := &ExecuteResult{
 			BoxName:       node.BoxName,
 			OriginalName:  originalName,
 			Node:          node.Node,
 			RunInParallel: plan.inParallel.Load(),
 			IsPanic:       false,
-			StartTime:     time.Now(),
+			StartTime:     now,
 			ExecuteBy:     plan.currentNode,
+			Success:       false,
+			Skipped:       true,
+			SkippedReason: fmt.Sprintf(message(plan.config.Language, nodeHasFailedDependence), node.BoxName, failedNode),
+			EndTime:       now,
 		}
-		result.Success = false
-		result.Skipped = true
-		result.SkippedReason = fmt.Sprintf(message(plan.config.Language, nodeHasFailedDependence), node.BoxName, failedNode)
-		result.EndTime = time.Now()
 		return false, result, nil
 	}
 
@@ -252,35 +254,36 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 			return nil
 		})
 		if err != nil {
+			now := time.Now()
 			result := &ExecuteResult{
 				BoxName:       node.BoxName,
 				OriginalName:  originalName,
 				Node:          node.Node,
 				RunInParallel: plan.inParallel.Load(),
-				IsPanic:       false,
-				StartTime:     time.Now(),
+				IsPanic:       isPanic,
+				StartTime:     now,
 				ExecuteBy:     plan.currentNode,
+				EndTime:       now,
+				Err:           err,
+				Success:       false,
 			}
-			result.Success = false
-			result.IsPanic = isPanic
-			result.Err = err
-			result.EndTime = time.Now()
 			return false, result, nil
 		}
 		if !pass {
+			now := time.Now()
 			result := &ExecuteResult{
 				BoxName:       node.BoxName,
 				OriginalName:  originalName,
 				Node:          node.Node,
 				RunInParallel: plan.inParallel.Load(),
 				IsPanic:       false,
-				StartTime:     time.Now(),
+				StartTime:     now,
 				ExecuteBy:     plan.currentNode,
+				Success:       true,
+				Skipped:       true,
+				SkippedReason: fmt.Sprintf(message(plan.config.Language, conditionEvaludateToFalse), node.BoxName),
+				EndTime:       now,
 			}
-			result.Success = true
-			result.Skipped = true
-			result.SkippedReason = fmt.Sprintf(message(plan.config.Language, conditionEvaludateToFalse), node.BoxName)
-			result.EndTime = time.Now()
 			return false, result, nil
 		}
 	}
