@@ -642,8 +642,8 @@ func TestParallelFlowNode(t *testing.T) {
 	state := new(State)
 	eng := NewEngine[*State]("")
 	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_1", []string{
-		"Operator1_1", 
-		"Operator1_2", 
+		"Operator1_1",
+		"Operator1_2",
 		"Operator1_3",
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
@@ -655,4 +655,28 @@ func TestParallelFlowNode(t *testing.T) {
 	assert.NoError(t, eng.Prepare())
 	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "PlanExtractor"))
 
+}
+
+func BenchmarkNormalNodeGraph1(b *testing.B) {
+	node := new(Node[*State])
+
+	eng := NewEngine[*State]("")
+	AddNode(eng, NewNodeType3("Type1_1", nil))
+	AddNode(eng, NewNodeType3("Type1_2", []string{"Type1_1"}))
+	AddNode(eng, NewNodeType3("Type1_3", []string{"Type1_1"}))
+	AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_1"}))
+
+	AddNode(eng, NewNodeType4("Type2_1", []*Dependence[*State]{
+		node.StaticDependence("Type1_3"), node.ConditionalDependence("Type1_1", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_2"}),
+	}))
+	AddNode(eng, NewNodeType4("Type2_2", []*Dependence[*State]{
+		node.StaticDependence("Type1_2"), node.ConditionalDependence("Type2_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_2", "Type1_4"}),
+	}))
+
+	eng.Prepare()
+
+	state := new(State)
+	for i := 0; i < b.N; i++ {
+		eng.Run(context.Background(), state, "Type2_2")
+	}
 }
