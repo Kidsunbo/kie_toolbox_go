@@ -192,6 +192,31 @@ func NewNodePanicType(name string, dep []string) *NodePanicType {
 	}
 }
 
+type NodeStopType struct {
+	FlowNode
+	StringDependence
+}
+
+func (n *NodeStopType) Run(ctx context.Context, state *State, plan *Plan) error {
+	state.Lock.Lock()
+	defer state.Lock.Unlock()
+	state.Stamps = append(state.Stamps, n.name)
+	state.ConcurrentInfo = append(state.ConcurrentInfo, plan.InParallel())
+	plan.Stop()
+	return nil
+}
+
+func NewNodeStopType(name string, dep []string) *NodeStopType {
+	return &NodeStopType{
+		FlowNode: FlowNode{
+			name: name,
+		},
+		StringDependence: StringDependence{
+			dependence: dep,
+		},
+	}
+}
+
 type NodePlanExtractor struct {
 	plan **Plan
 	FlowNode
@@ -499,6 +524,29 @@ func TestNormalNodeGraph5(t *testing.T) {
 	assert.Equal(t, 3, len(state.ConcurrentInfo))
 	assert.ElementsMatch(t, []string{"Type1_1", "Type1_2", "Type1_4"}, state.Stamps[0:3])
 	assert.Equal(t, []bool{true, true}, state.ConcurrentInfo[:2])
+}
+
+func TestStop(t *testing.T) {
+	node := new(Node[*State])
+
+	eng := NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_0", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeStopType("Type1_2", []string{"Type1_1"})))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_3", []*Dependence[*State]{nil})))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_4", []*Dependence[*State]{node.StaticDependence("Type1_3")})))
+
+	assert.NoError(t, eng.Prepare())
+
+	state := new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_0", "Type1_2", "Type1_4"))
+	assert.Equal(t, []string{"Type1_0", "Type1_1", "Type1_2"}, state.Stamps)
+	assert.Equal(t, []bool{false, false, false}, state.ConcurrentInfo)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_0", "Type1_1", "Type1_4"))
+	assert.Equal(t, []string{"Type1_0", "Type1_1", "Type1_3", "Type1_4"}, state.Stamps)
+	assert.Equal(t, []bool{false, false, false, false}, state.ConcurrentInfo)
 }
 
 func TestLanguage(t *testing.T) {

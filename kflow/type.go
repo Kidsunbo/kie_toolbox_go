@@ -70,6 +70,7 @@ type ExecuteResult struct {
 
 type Plan struct {
 	config                 *config                   // The config. User should not modify it at runtime
+	stop                   atomic.Bool               // If the process should stop
 	chainNodes             []string                  // The nodes specified by Run method in engine.
 	failedNodes            map[string]struct{}       // The node reference to all the failed running node. Key is BoxName
 	finishedOriginalNodes  map[string]struct{}       // The FinishedNodes uses BoxName as its key. But different BoxName might has the same node, so it's convenient to maintain this field for filtering
@@ -123,7 +124,7 @@ func (p *Plan) GetCurrentNode() string {
 	return p.currentNode
 }
 
-// GetChainNodes returns all the nodes in the chain. It's useful to draw a flow 
+// GetChainNodes returns all the nodes in the chain. It's useful to draw a flow
 func (p *Plan) GetChainNodes() []string {
 	return p.chainNodes
 }
@@ -131,4 +132,9 @@ func (p *Plan) GetChainNodes() []string {
 // GetStartTime gets the start time of the process.
 func (p *Plan) GetStartTime() time.Time {
 	return p.startTime
+}
+
+// Stop stops the process. User might record the stop reason to state and then stop the process.
+func (p *Plan) Stop() {
+	p.stop.Store(true)
 }
