@@ -23,6 +23,9 @@ func (n *nodeExecutor[T]) Execute(ctx context.Context, nodes *container.Dag[stri
 		if err := n.executeNode(ctx, nodes, state, plan); err != nil {
 			return err
 		}
+		if plan.stop.Load() {
+			return nil
+		}
 	}
 
 	return nil
