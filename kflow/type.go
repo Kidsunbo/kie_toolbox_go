@@ -24,13 +24,11 @@ type IDependency[T any, R dependenceReturnType[T]] interface {
 
 // IBasicNode specifies the interface for basic node.
 type IBasicNode[T any] interface {
-	INode
 	Run(ctx context.Context, state T) error
 }
 
 // IFlowNode specifies the interface for flow node.
 type IFlowNode[T any] interface {
-	INode
 	Run(ctx context.Context, state T, plan *Plan) error
 }
 
