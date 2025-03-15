@@ -16,9 +16,27 @@ type Dependence[S any] struct {
 	Dependences []string
 }
 
+func (d Dependence[S]) GetName() string {
+	return d.Name
+}
+
+func (d Dependence[S]) GetFunction() Condition[S] {
+	return d.Function
+}
+
+func (d Dependence[S]) GetDependences() []string {
+	return d.Dependences
+}
+
+type IDependence[S any] interface {
+	GetName() string
+	GetFunction() Condition[S]
+	GetDependences() []string
+}
+
 type IDescription[S any] interface {
 	GetName() string
-	GetDependence() []Dependence[S]
+	GetDependence() []IDependence[S]
 }
 
 type INode[S any, D IDescription[S]] interface {

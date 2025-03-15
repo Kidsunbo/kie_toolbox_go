@@ -22,10 +22,10 @@ func (n *nodeWrapper[S, D, T]) Dependence() []*kflow.Dependence[S] {
 	description := n.node.Description()
 	dependences := make([]*kflow.Dependence[S], 0, len(description.GetDependence()))
 	for _, dependence := range description.GetDependence() {
-		if dependence.Function == nil {
-			dependences = append(dependences, n.StaticDependence(dependence.Name))
+		if dependence.GetFunction() == nil {
+			dependences = append(dependences, n.StaticDependence(dependence.GetName()))
 		} else {
-			dependences = append(dependences, n.ConditionalDependence(dependence.Name, kflow.Condition[S](dependence.Function), dependence.Dependences))
+			dependences = append(dependences, n.ConditionalDependence(dependence.GetName(), kflow.Condition[S](dependence.GetFunction()), dependence.GetDependences()))
 		}
 	}
 	return dependences
