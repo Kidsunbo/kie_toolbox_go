@@ -25,8 +25,7 @@ type INode[S any, D IDescription[S]] interface {
 	Description() D
 }
 
-type IState interface {
-}
+type IState any
 
 type IRunMiddleware[S IState, D IDescription[S]] interface {
 	Before(ctx context.Context, state S, desc D)
