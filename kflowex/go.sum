@@ -1,0 +1,12 @@
+github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250112135920-8e9c4376ed9d h1:o74mW+JDXiCHbzuLdzNScPy9dAsnD07C2KFAhuja2/4=
+github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250112135920-8e9c4376ed9d/go.mod h1:K3WXCBwfHxGaXnFQ5cenYzTor0TtwK2kY1NN2Ru6NNg=
+github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20250313154546-fa9482f9ddee h1:MsXvkr3W3qkK7wed+p1F/MfybNr+rTPnWD5V/eQWX8o=
+github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20250313154546-fa9482f9ddee/go.mod h1:6eG5IAfbc1YEhwL2DZp7OWkFUXUFtp2ryCiTYZ+dKII=
+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
+github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
+gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
