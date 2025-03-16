@@ -21,6 +21,24 @@ func (s *State) AddStep(step string) {
 	s.Step = append(s.Step, step)
 }
 
+type Dependence[S any] struct {
+	Name        string
+	Function    kflowex.Condition[S]
+	Dependences []string
+}
+
+func (d Dependence[S]) GetName() string {
+	return d.Name
+}
+
+func (d Dependence[S]) GetFunction() kflowex.Condition[S] {
+	return d.Function
+}
+
+func (d Dependence[S]) GetDependences() []string {
+	return d.Dependences
+}
+
 type Description[S any] struct {
 	Name       string
 	Dependence []string
@@ -33,7 +51,7 @@ func (d Description[S]) GetName() string {
 func (d Description[S]) GetDependence() []kflowex.IDependence[*State] {
 	deps := make([]kflowex.IDependence[*State], 0, len(d.Dependence))
 	for _, dep := range d.Dependence {
-		deps = append(deps, kflowex.Dependence[*State]{
+		deps = append(deps, Dependence[*State]{
 			Name: dep,
 		})
 	}

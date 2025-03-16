@@ -10,24 +10,6 @@ type Plan = kflow.Plan
 
 type Condition[T any] kflow.Condition[T]
 
-type Dependence[S any] struct {
-	Name        string
-	Function    Condition[S]
-	Dependences []string
-}
-
-func (d Dependence[S]) GetName() string {
-	return d.Name
-}
-
-func (d Dependence[S]) GetFunction() Condition[S] {
-	return d.Function
-}
-
-func (d Dependence[S]) GetDependences() []string {
-	return d.Dependences
-}
-
 type IDependence[S any] interface {
 	GetName() string
 	GetFunction() Condition[S]
