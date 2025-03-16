@@ -187,7 +187,6 @@ func TestFlowNodeDescription(t *testing.T) {
 
 func TestFlowNodeMiddleware(t *testing.T) {
 	state := &State{
-		Step: []string{},
 	}
 
 	step := make([]string, 0)
