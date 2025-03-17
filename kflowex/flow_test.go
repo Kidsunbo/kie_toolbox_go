@@ -23,7 +23,7 @@ func (s *State) AddStep(step string) {
 
 type Dependence[S any] struct {
 	Name        string
-	Function    kflowex.Condition[S]
+	Condition    kflowex.Condition[S]
 	Dependences []string
 }
 
@@ -32,7 +32,7 @@ func (d Dependence[S]) GetName() string {
 }
 
 func (d Dependence[S]) GetCondition() kflowex.Condition[S] {
-	return d.Function
+	return d.Condition
 }
 
 func (d Dependence[S]) GetDependences() []string {
