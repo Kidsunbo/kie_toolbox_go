@@ -31,7 +31,7 @@ func (d Dependence[S]) GetName() string {
 	return d.Name
 }
 
-func (d Dependence[S]) GetFunction() kflowex.Condition[S] {
+func (d Dependence[S]) GetCondition() kflowex.Condition[S] {
 	return d.Function
 }
 
@@ -48,7 +48,7 @@ func (d Description[S]) GetName() string {
 	return d.Name
 }
 
-func (d Description[S]) GetDependence() []kflowex.IDependence[*State] {
+func (d Description[S]) GetDependences() []kflowex.IDependence[*State] {
 	deps := make([]kflowex.IDependence[*State], 0, len(d.Dependence))
 	for _, dep := range d.Dependence {
 		deps = append(deps, Dependence[*State]{
