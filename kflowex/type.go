@@ -27,10 +27,9 @@ type INode[S any, D IDescription[S]] interface {
 
 type IState any
 
-// IRunMiddleware is the interface for middleware, if error is return, stop the execution of the node immediately. You can also use plan to stop the execution of the whole flow.
 type IRunMiddleware[S IState, D IDescription[S]] interface {
-	Before(ctx context.Context, desc D, state S, plan *Plan) error
-	After(ctx context.Context, desc D, state S, plan *Plan, err error) error
+	Before(ctx context.Context, desc D, state S, plan *Plan)
+	After(ctx context.Context, desc D, state S, plan *Plan, err error)
 }
 
 type IAddMiddleware[S IState, D IDescription[S]] interface {

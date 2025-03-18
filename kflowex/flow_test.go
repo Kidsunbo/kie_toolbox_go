@@ -2,7 +2,6 @@ package kflowex_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -157,42 +156,12 @@ type RunMW[S kflowex.IState, D kflowex.IDescription[S]] struct {
 	name string
 }
 
-func (a *RunMW[S, D]) Before(ctx context.Context, desc D, state S, plan *kflowex.Plan) error {
+func (a *RunMW[S, D]) Before(ctx context.Context, desc D, state S, plan *kflowex.Plan) {
 	any(state).(*State).AddStep(fmt.Sprintf("b_%v", a.name))
-	return nil
 }
 
-func (a *RunMW[S, D]) After(ctx context.Context, desc D, state S, plan *kflowex.Plan, err error) error {
+func (a *RunMW[S, D]) After(ctx context.Context, desc D, state S, plan *kflowex.Plan, err error) {
 	any(state).(*State).AddStep(fmt.Sprintf("a_%v", a.name))
-	return nil
-}
-
-type RunMWBeforeError[S kflowex.IState, D kflowex.IDescription[S]] struct {
-	name string
-}
-
-func (a *RunMWBeforeError[S, D]) Before(ctx context.Context, desc D, state S, plan *kflowex.Plan) error {
-	any(state).(*State).AddStep(fmt.Sprintf("b_%v", a.name))
-	return errors.New("error")
-}
-
-func (a *RunMWBeforeError[S, D]) After(ctx context.Context, desc D, state S, plan *kflowex.Plan, err error) error {
-	any(state).(*State).AddStep(fmt.Sprintf("a_%v", a.name))
-	return nil
-}
-
-type RunMWAfterError[S kflowex.IState, D kflowex.IDescription[S]] struct {
-	name string
-}
-
-func (a *RunMWAfterError[S, D]) Before(ctx context.Context, desc D, state S, plan *kflowex.Plan) error {
-	any(state).(*State).AddStep(fmt.Sprintf("b_%v", a.name))
-	return nil
-}
-
-func (a *RunMWAfterError[S, D]) After(ctx context.Context, desc D, state S, plan *kflowex.Plan, err error) error {
-	any(state).(*State).AddStep(fmt.Sprintf("a_%v", a.name))
-	return errors.New("error")
 }
 
 func TestFlowAddNodeSuccess(t *testing.T) {
@@ -302,38 +271,4 @@ func TestFlowNodeMiddleware(t *testing.T) {
 	assert.Equal(t, 15, len(state.Step))
 	assert.ElementsMatch(t, []string{"b_runMW1", "b_runMW2", "Node1", "a_runMW2", "a_runMW1", "b_runMW1", "b_runMW2", "Node2", "a_runMW2", "a_runMW1"}, state.Step[:10])
 	assert.Equal(t, []string{"b_runMW1", "b_runMW2", "Node3", "a_runMW2", "a_runMW1"}, state.Step[10:15])
-
-	runMWBeforeErr := &RunMWBeforeError[*State, Description[*State]]{
-		name: "runMWBeforeErr",
-	}
-	engine, err = kflowex.NewFlowBuilder("test", func(f *kflowex.Flow[*State, Description[*State]]) {
-		assert.NoError(t, kflowex.AddNode(f, NewNode1))
-		assert.NoError(t, kflowex.AddNode(f, NewNode2))
-		assert.NoError(t, kflowex.AddNode(f, NewNode3))
-	}).WithRunMiddleware(runMW1, runMW2, runMWBeforeErr).Build()
-	assert.NoError(t, err)
-
-	state = &State{
-		Step: []string{},
-	}
-	assert.NoError(t, engine.Run(context.Background(), state, "Node1", "Node2"))
-	assert.Equal(t, 6, len(state.Step))
-	assert.Equal(t, []string{"b_runMW1", "b_runMW2", "b_runMWBeforeErr", "b_runMW1", "b_runMW2", "b_runMWBeforeErr"}, state.Step)
-
-	runMWAfterErr := &RunMWAfterError[*State, Description[*State]]{
-		name: "runMWAfterErr",
-	}
-	engine, err = kflowex.NewFlowBuilder("test", func(f *kflowex.Flow[*State, Description[*State]]) {
-		assert.NoError(t, kflowex.AddNode(f, NewNode1))
-		assert.NoError(t, kflowex.AddNode(f, NewNode2))
-		assert.NoError(t, kflowex.AddNode(f, NewNode3))
-	}).WithRunMiddleware(runMW1, runMWAfterErr, runMW2).Build()
-	assert.NoError(t, err)
-
-	state = &State{
-		Step: []string{},
-	}
-	assert.NoError(t, engine.Run(context.Background(), state, "Node1", "Node2"))
-	assert.Equal(t, 12, len(state.Step))
-	assert.Equal(t, []string{"b_runMW1", "b_runMWAfterErr", "b_runMW2", "Node1", "a_runMW2", "a_runMWAfterErr", "b_runMW1", "b_runMWAfterErr", "b_runMW2", "Node2", "a_runMW2", "a_runMWAfterErr",}, state.Step)
 }
