@@ -36,7 +36,9 @@ func (n *nodeWrapper[S, D, T]) Run(ctx context.Context, state S, plan *Plan) err
 	desc := v.Description()
 
 	for i := 0; i < len(n.mw); i++ {
-		n.mw[i].Before(ctx, state, desc)
+		if err := n.mw[i].Before(ctx, desc, state, plan); err != nil {
+			return err
+		}
 	}
 
 	var err error
@@ -49,7 +51,9 @@ func (n *nodeWrapper[S, D, T]) Run(ctx context.Context, state S, plan *Plan) err
 	}
 
 	for i := len(n.mw) - 1; i >= 0; i-- {
-		n.mw[i].After(ctx, state, desc, err)
+		if err := n.mw[i].After(ctx, desc, state, plan, err); err != nil {
+			return err
+		}
 	}
 	return err
 }
