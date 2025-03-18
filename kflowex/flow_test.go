@@ -23,7 +23,7 @@ func (s *State) AddStep(step string) {
 
 type Dependence[S any] struct {
 	Name        string
-	Condition    kflowex.Condition[S]
+	Condition   kflowex.Condition[S]
 	Dependences []string
 }
 
@@ -40,20 +40,24 @@ func (d Dependence[S]) GetDependences() []string {
 }
 
 type Description[S any] struct {
-	Name       string
-	Dependence []string
+	Name                  string
+	Dependence            []string
+	ConditionalDependence []Dependence[S]
 }
 
 func (d Description[S]) GetName() string {
 	return d.Name
 }
 
-func (d Description[S]) GetDependences() []kflowex.IDependence[*State] {
-	deps := make([]kflowex.IDependence[*State], 0, len(d.Dependence))
+func (d Description[S]) GetDependences() []kflowex.IDependence[S] {
+	deps := make([]kflowex.IDependence[S], 0, len(d.Dependence))
 	for _, dep := range d.Dependence {
-		deps = append(deps, Dependence[*State]{
+		deps = append(deps, Dependence[S]{
 			Name: dep,
 		})
+	}
+	for _, dep := range d.ConditionalDependence {
+		deps = append(deps, dep)
 	}
 	return deps
 }
@@ -107,6 +111,31 @@ func (n *Node3) Description() Description[*State] {
 
 func (n *Node3) Run(ctx context.Context, state *State, plan *kflowex.Plan) error {
 	state.AddStep("Node3")
+	return nil
+}
+
+type Node4 struct{}
+
+func NewNode4() *Node4 {
+	return &Node4{}
+}
+
+func (n *Node4) Description() Description[*State] {
+	return Description[*State]{
+		Name:       "Node4",
+		Dependence: []string{"Node1"},
+		ConditionalDependence: []Dependence[*State]{
+			{
+				Name:        "Node2",
+				Condition:   func(ctx context.Context, state *State) bool { return true },
+				Dependences: []string{"Node3"},
+			},
+		},
+	}
+}
+
+func (n *Node4) Run(ctx context.Context, state *State, plan *kflowex.Plan) error {
+	state.AddStep("Node4")
 	return nil
 }
 
@@ -185,9 +214,24 @@ func TestFlowNodeDescription(t *testing.T) {
 	assert.Equal(t, "Node3", state.Step[2])
 }
 
-func TestFlowNodeMiddleware(t *testing.T) {
+func TestFlowNodeCondition(t *testing.T) {
 	state := &State{
+		Step: []string{},
 	}
+	engine, err := kflowex.NewFlowBuilder("test", func(f *kflowex.Flow[*State, Description[*State]]) {
+		assert.NoError(t, kflowex.AddNode(f, NewNode1))
+		assert.NoError(t, kflowex.AddNode(f, NewNode2))
+		assert.NoError(t, kflowex.AddNode(f, NewNode3))
+		assert.NoError(t, kflowex.AddNode(f, NewNode4))
+	}).Build()
+	assert.NoError(t, err)
+	assert.NoError(t, engine.Run(context.Background(), state, "Node4"))
+	assert.ElementsMatch(t, []string{"Node1", "Node2", "Node3"}, state.Step[:3])
+	assert.Equal(t, "Node4", state.Step[3])
+}
+
+func TestFlowNodeMiddleware(t *testing.T) {
+	state := &State{}
 
 	step := make([]string, 0)
 	addMW1 := &AddMW[*State, Description[*State]]{
