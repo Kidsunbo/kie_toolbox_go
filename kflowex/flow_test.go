@@ -2,6 +2,7 @@ package kflowex_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -156,12 +157,28 @@ type RunMW[S kflowex.IState, D kflowex.IDescription[S]] struct {
 	name string
 }
 
-func (a *RunMW[S, D]) Before(ctx context.Context, state S, desc D) {
+func (a *RunMW[S, D]) Before(ctx context.Context, desc D, state S, plan *kflowex.Plan) error {
 	any(state).(*State).AddStep(fmt.Sprintf("b_%v", a.name))
+	return nil
 }
 
-func (a *RunMW[S, D]) After(ctx context.Context, state S, desc D, err error) {
+func (a *RunMW[S, D]) After(ctx context.Context, desc D, state S, plan *kflowex.Plan, err error) error {
 	any(state).(*State).AddStep(fmt.Sprintf("a_%v", a.name))
+	return nil
+}
+
+type RunMWWithError[S kflowex.IState, D kflowex.IDescription[S]] struct {
+	name string
+}
+
+func (a *RunMWWithError[S, D]) Before(ctx context.Context, desc D, state S, plan *kflowex.Plan) error {
+	any(state).(*State).AddStep(fmt.Sprintf("b_%v", a.name))
+	return errors.New("error")
+}
+
+func (a *RunMWWithError[S, D]) After(ctx context.Context, desc D, state S, plan *kflowex.Plan, err error) error {
+	any(state).(*State).AddStep(fmt.Sprintf("a_%v", a.name))
+	return errors.New("error")
 }
 
 func TestFlowAddNodeSuccess(t *testing.T) {
@@ -271,4 +288,21 @@ func TestFlowNodeMiddleware(t *testing.T) {
 	assert.Equal(t, 15, len(state.Step))
 	assert.ElementsMatch(t, []string{"b_runMW1", "b_runMW2", "Node1", "a_runMW2", "a_runMW1", "b_runMW1", "b_runMW2", "Node2", "a_runMW2", "a_runMW1"}, state.Step[:10])
 	assert.Equal(t, []string{"b_runMW1", "b_runMW2", "Node3", "a_runMW2", "a_runMW1"}, state.Step[10:15])
+
+	runMWErr := &RunMWWithError[*State, Description[*State]]{
+		name: "runMWErr",
+	}
+	engine, err = kflowex.NewFlowBuilder("test", func(f *kflowex.Flow[*State, Description[*State]]) {
+		assert.NoError(t, kflowex.AddNode(f, NewNode1))
+		assert.NoError(t, kflowex.AddNode(f, NewNode2))
+		assert.NoError(t, kflowex.AddNode(f, NewNode3))
+	}).WithRunMiddleware(runMW1, runMW2, runMWErr).Build()
+	assert.NoError(t, err)
+
+	state = &State{
+		Step: []string{},
+	}
+	assert.NoError(t, engine.Run(context.Background(), state, "Node1", "Node2"))
+	assert.Equal(t, 6, len(state.Step))
+	assert.ElementsMatch(t, []string{"b_runMW1", "b_runMW2", "b_runMWErr", "b_runMW1", "b_runMW2", "b_runMWErr"}, state.Step)
 }
