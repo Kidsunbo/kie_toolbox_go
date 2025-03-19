@@ -19,12 +19,12 @@ func newNodeExecutor[T any]() *nodeExecutor[T] {
 func (n *nodeExecutor[T]) Execute(ctx context.Context, nodes *container.Dag[string, *nodeBox[T]], state T, plan *Plan) error {
 
 	for _, node := range plan.chainNodes {
+		if plan.stop.Load() {
+			return nil
+		}
 		plan.currentNode = node
 		if err := n.executeNode(ctx, nodes, state, plan); err != nil {
 			return err
-		}
-		if plan.stop.Load() {
-			return nil
 		}
 	}
 

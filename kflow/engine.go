@@ -182,6 +182,8 @@ func (n *Engine[T]) execute(ctx context.Context, state T, nodes []string) error 
 func (n *Engine[T]) makePlan(nodes []string) *Plan {
 	return &Plan{
 		config:                 n.config,
+		executor:               n.executor,
+		nodes:                  n.nodes,
 		stop:                   atomic.Bool{},
 		chainNodes:             nodes,
 		failedNodes:            make(map[string]struct{}),

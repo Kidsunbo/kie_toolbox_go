@@ -256,14 +256,7 @@ func (n *NodeAddNodeType) Run(ctx context.Context, state *State, plan *Plan) err
 	defer state.Lock.Unlock()
 	state.Stamps = append(state.Stamps, n.name)
 	state.ConcurrentInfo = append(state.ConcurrentInfo, plan.InParallel())
-
-	for _, node := range n.nodes {
-		err := plan.AddTargetNode(node)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return plan.AddTargetNodes(n.nodes...)
 }
 
 func NewNodeAddNodeType(name string, dep []string, nodes []string) *NodeAddNodeType {
@@ -297,7 +290,7 @@ func (n *NodePlanOperatorType) Run(ctx context.Context, state *State, plan *Plan
 	assert.Error(t, err)
 	_, err = plan.GetTargetNodes()
 	assert.Error(t, err)
-	err = plan.AddTargetNode("Type_2")
+	err = plan.AddTargetNodes("Type_2")
 	assert.Error(t, err)
 
 	return nil
@@ -312,6 +305,44 @@ func NewNodePlanOperatorType(name string, dep []string, t *testing.T) *NodePlanO
 			dependence: dep,
 		},
 		t: t,
+	}
+}
+
+type NodeExecuteInRunType struct {
+	FlowNode
+	StringDependence
+	t           *testing.T
+	firstBatch  []string
+	secondBatch []string
+}
+
+func (n *NodeExecuteInRunType) Run(ctx context.Context, state *State, plan *Plan) error {
+
+	state.Lock.Lock()
+	state.Stamps = append(state.Stamps, n.name)
+	state.Lock.Unlock()
+
+	err := Execute(ctx, state, plan, n.firstBatch...)
+	assert.NoError(n.t, err)
+
+
+	err = Execute(ctx, state, plan, n.secondBatch...)
+	assert.NoError(n.t, err)
+
+	return nil
+}
+
+func NewNodeExecuteInRunType(name string, dep []string, firstBatch, secondBatch []string, t *testing.T) *NodeExecuteInRunType {
+	return &NodeExecuteInRunType{
+		FlowNode: FlowNode{
+			name: name,
+		},
+		StringDependence: StringDependence{
+			dependence: dep,
+		},
+		t:           t,
+		firstBatch:  firstBatch,
+		secondBatch: secondBatch,
 	}
 }
 
@@ -703,6 +734,28 @@ func TestParallelFlowNode(t *testing.T) {
 	assert.NoError(t, eng.Prepare())
 	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "PlanExtractor"))
 
+}
+
+func TestExecuteInRun(t *testing.T) {
+	var plan *Plan
+
+	state := new(State)
+	eng := NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_1", []string{
+		"Operator1_1",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil, []string{"Type1_3", "Type1_5"}, []string{"Type1_4"}, t)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", []string{"Type1_6"})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_7", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+
+	assert.NoError(t, eng.Prepare())
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "PlanExtractor"))
+	fmt.Println(state.Stamps)
 }
 
 func BenchmarkNormalNodeGraph1(b *testing.B) {
