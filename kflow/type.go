@@ -68,6 +68,8 @@ type ExecuteResult struct {
 
 type Plan struct {
 	config                 *config                   // The config. User should not modify it at runtime
+	executor               any                       // The executor. User should not modify it at runtime
+	nodes                  any                       // The nodes in the engine. User should not modify it at runtime
 	stop                   atomic.Bool               // If the process should stop
 	chainNodes             []string                  // The nodes specified by Run method in engine.
 	failedNodes            map[string]struct{}       // The node reference to all the failed running node. Key is BoxName
@@ -94,12 +96,14 @@ func (p *Plan) GetTargetNodes() ([]string, error) {
 	return keys(p.targetNodes), nil
 }
 
-// AddTargetNode adds node to the target dynamically.
-func (p *Plan) AddTargetNode(node string) error {
+// AddTargetNodes adds nodes to the target dynamically.
+func (p *Plan) AddTargetNodes(nodes ...string) error {
 	if p.inParallel.Load() {
 		return errors.New(message(p.config.Language, operationNotSupportedInParallel))
 	}
-	p.targetNodes[node] = struct{}{}
+	for _, node := range nodes {
+		p.targetNodes[node] = struct{}{}
+	}
 	p.targetsSummary = nil
 	return nil
 }
@@ -135,4 +139,30 @@ func (p *Plan) GetStartTime() time.Time {
 // Stop stops the process. User might record the stop reason to state and then stop the process.
 func (p *Plan) Stop() {
 	p.stop.Store(true)
+}
+
+// copy will copy plan manually.
+func (p *Plan) copy() *Plan{
+	plan := &Plan{
+		config:                 p.config,
+		executor:               p.executor,
+		nodes:                  p.nodes,
+		stop:                   atomic.Bool{},
+		chainNodes:             p.chainNodes,
+		failedNodes:            p.failedNodes,
+		finishedOriginalNodes:  p.finishedOriginalNodes,
+		conditionalTargetNodes: p.conditionalTargetNodes,
+		startTime:              p.startTime,
+		finishedNodes:          p.finishedNodes,
+		runningNodes:           p.runningNodes,
+		inParallel:             atomic.Bool{},
+		currentNode:            p.currentNode,
+		targetsSummary:         p.targetsSummary,
+		targetNodes:            p.targetNodes,
+	}
+
+	plan.stop.Store(p.stop.Load())
+	plan.inParallel.Store(p.inParallel.Load())
+
+	return plan
 }
