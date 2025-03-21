@@ -24,13 +24,10 @@ func AddNode[T any](engine *Engine[T], node INode) error {
 
 // Execute will run the targets in the same executor, state and plan.
 func Execute[T any](ctx context.Context, state T, plan *Plan, targets ...string) error {
-	executor, ok := plan.executor.(IExecutor[T])
-	if !ok {
-		return fmt.Errorf(message(plan.config.Language, typeAssertFailed), plan.executor)
-	}
-	nodes, ok := plan.nodes.(*container.Dag[string, *nodeBox[T]])
-	if !ok {
-		return fmt.Errorf(message(plan.config.Language, typeAssertFailed), plan.nodes)
+	executor, okExecutor := plan.executor.(IExecutor[T])
+	nodes, okNodes := plan.nodes.(*container.Dag[string, *nodeBox[T]])
+	if !okExecutor || !okNodes {
+		return errors.New(message(plan.config.Language, typeAssertFailed))
 	}
 	if plan.inParallel.Load() {
 		return errors.New((message(plan.config.Language, operationNotSupportedInParallel)))
