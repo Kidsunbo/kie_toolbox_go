@@ -318,13 +318,12 @@ type NodeExecuteInRunType struct {
 
 func (n *NodeExecuteInRunType) Run(ctx context.Context, state *State, plan *Plan) error {
 
-	state.Lock.Lock()
-	state.Stamps = append(state.Stamps, n.name)
-	state.Lock.Unlock()
-
 	err := Execute(ctx, state, plan, n.firstBatch...)
 	assert.NoError(n.t, err)
 
+	state.Lock.Lock()
+	state.Stamps = append(state.Stamps, n.name)
+	state.Lock.Unlock()
 
 	err = Execute(ctx, state, plan, n.secondBatch...)
 	assert.NoError(n.t, err)
@@ -755,7 +754,19 @@ func TestExecuteInRun(t *testing.T) {
 
 	assert.NoError(t, eng.Prepare())
 	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "PlanExtractor"))
-	fmt.Println(state.Stamps)
+	assert.ElementsMatch(t, []string{"Type1_3", "Type1_6", "Type1_5"}, state.Stamps[:3])
+	assert.Equal(t, "Operator1_1", state.Stamps[3])
+	assert.ElementsMatch(t, []string{"Type1_4", "Type1_1", "PlanExtractor"}, state.Stamps[4:7])
+	assert.Equal(t, 7, len(plan.finishedNodes))
+	assert.Equal(t, []string{"Type1_1", "PlanExtractor"}, plan.GetChainNodes())
+	assert.True(t, plan.finishedNodes["Type1_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_5"].Success)
+	assert.True(t, plan.finishedNodes["Type1_4"].Success)
+	assert.True(t, plan.finishedNodes["Operator1_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_6"].Success)
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
 }
 
 func BenchmarkNormalNodeGraph1(b *testing.B) {
