@@ -296,7 +296,7 @@ func (n *NodePlanOperatorType) Run(ctx context.Context, state *State, plan *Plan
 	return nil
 }
 
-func NewNodePlanOperatorType(name string, dep []string, t *testing.T) *NodePlanOperatorType {
+func NewNodePlanOperatorType(name string, dep []string) *NodePlanOperatorType {
 	return &NodePlanOperatorType{
 		FlowNode: FlowNode{
 			name: name,
@@ -304,14 +304,12 @@ func NewNodePlanOperatorType(name string, dep []string, t *testing.T) *NodePlanO
 		StringDependence: StringDependence{
 			dependence: dep,
 		},
-		t: t,
 	}
 }
 
 type NodeExecuteInRunType struct {
 	FlowNode
 	StringDependence
-	t           *testing.T
 	firstBatch  []string
 	secondBatch []string
 }
@@ -319,19 +317,23 @@ type NodeExecuteInRunType struct {
 func (n *NodeExecuteInRunType) Run(ctx context.Context, state *State, plan *Plan) error {
 
 	err := Execute(ctx, state, plan, n.firstBatch...)
-	assert.NoError(n.t, err)
+	if err != nil {
+		return err
+	}
 
 	state.Lock.Lock()
 	state.Stamps = append(state.Stamps, n.name)
 	state.Lock.Unlock()
 
 	err = Execute(ctx, state, plan, n.secondBatch...)
-	assert.NoError(n.t, err)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func NewNodeExecuteInRunType(name string, dep []string, firstBatch, secondBatch []string, t *testing.T) *NodeExecuteInRunType {
+func NewNodeExecuteInRunType(name string, dep []string, firstBatch, secondBatch []string) *NodeExecuteInRunType {
 	return &NodeExecuteInRunType{
 		FlowNode: FlowNode{
 			name: name,
@@ -339,7 +341,6 @@ func NewNodeExecuteInRunType(name string, dep []string, firstBatch, secondBatch 
 		StringDependence: StringDependence{
 			dependence: dep,
 		},
-		t:           t,
 		firstBatch:  firstBatch,
 		secondBatch: secondBatch,
 	}
@@ -725,9 +726,9 @@ func TestParallelFlowNode(t *testing.T) {
 		"Operator1_3",
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
-	assert.NoError(t, AddNode(eng, NewNodePlanOperatorType("Operator1_1", nil, t)))
-	assert.NoError(t, AddNode(eng, NewNodePlanOperatorType("Operator1_2", nil, t)))
-	assert.NoError(t, AddNode(eng, NewNodePlanOperatorType("Operator1_3", nil, t)))
+	assert.NoError(t, AddNode(eng, NewNodePlanOperatorType("Operator1_1", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePlanOperatorType("Operator1_2", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePlanOperatorType("Operator1_3", nil)))
 	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
 
 	assert.NoError(t, eng.Prepare())
@@ -744,7 +745,7 @@ func TestExecuteInRun(t *testing.T) {
 		"Operator1_1",
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
-	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil, []string{"Type1_3", "Type1_5"}, []string{"Type1_4"}, t)))
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil, []string{"Type1_3", "Type1_5"}, []string{"Type1_4"})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", []string{"Type1_6"})))
@@ -766,6 +767,35 @@ func TestExecuteInRun(t *testing.T) {
 	assert.True(t, plan.finishedNodes["Operator1_1"].Success)
 	assert.True(t, plan.finishedNodes["Type1_6"].Success)
 	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+	state = new(State)
+	eng = NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_1", []string{
+		"Operator1_1",
+		"Type1_2",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil, []string{"Type1_3", "Type1_5"}, []string{"Type1_4"})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", []string{"Type1_6"})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_7", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+
+	assert.NoError(t, eng.Prepare())
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "PlanExtractor"))
+	assert.Equal(t, 2, len(state.Stamps))
+	assert.Equal(t, []string{"Type1_2", "PlanExtractor"}, state.Stamps)
+	assert.Equal(t, 4, len(plan.finishedNodes))
+	assert.Equal(t, []string{"Type1_1", "PlanExtractor"}, plan.GetChainNodes())
+	assert.True(t, plan.finishedNodes["Type1_2"].Success)
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+	assert.False(t, plan.finishedNodes["Operator1_1"].Success)
+	assert.Error(t, errors.New("操作不支持在并行环境中运行"), plan.finishedNodes["Operator1_1"].Err)
+	assert.False(t, plan.finishedNodes["Type1_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_1"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type1_1"].Err)
 
 }
 
