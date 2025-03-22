@@ -557,6 +557,33 @@ func TestNormalNodeGraph5(t *testing.T) {
 	assert.Equal(t, []bool{true, true}, state.ConcurrentInfo[:2])
 }
 
+func TestNormalNodeGraph6(t *testing.T) {
+	node := new(Node[*State])
+
+	var plan *Plan
+	eng := NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_2", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_3", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType2("Type1_1", []*Dependence[*State]{
+		node.ConditionalDependence("Type1_2", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_3"}),
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_2"})))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+
+	assert.NoError(t, eng.Prepare())
+	// fmt.Println(eng.Dot())
+
+	state := new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "Type1_4", "PlanExtractor"))
+	assert.Equal(t, []string{"Type1_3", "Type1_1", "Type1_2", "Type1_4", "PlanExtractor"}, state.Stamps)
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_2"].Success)
+	assert.True(t, plan.finishedNodes["Type1_4"].Success)
+	assert.True(t, plan.finishedNodes["Type1_2_by_Type1_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_2_by_Type1_1"].Skipped)
+}
+
 func TestStop(t *testing.T) {
 	node := new(Node[*State])
 
