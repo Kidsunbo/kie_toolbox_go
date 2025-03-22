@@ -69,7 +69,9 @@ func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[
 
 func (n *nodeExecutor[T]) saveResult(result *ExecuteResult, plan *Plan) {
 	plan.finishedNodes[result.BoxName] = result
-	plan.finishedOriginalNodes[result.OriginalName] = struct{}{}
+	if result.BoxName == result.OriginalName {
+		plan.finishedOriginalNodes[result.OriginalName] = struct{}{}
+	}
 	delete(plan.runningNodes, result.OriginalName)
 	if !result.Success {
 		plan.failedNodes[result.BoxName] = struct{}{}

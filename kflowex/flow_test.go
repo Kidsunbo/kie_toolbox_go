@@ -139,6 +139,30 @@ func (n *Node4) Run(ctx context.Context, state *State, plan *kflowex.Plan) error
 	return nil
 }
 
+type Node5 struct{}
+
+func NewNode5() *Node5 {
+	return &Node5{}
+}
+
+func (n *Node5) Description() Description[*State] {
+	return Description[*State]{
+		Name:       "Node5",
+		Dependence: []string{"Node1"},
+		ConditionalDependence: []Dependence[*State]{
+			{
+				Name:        "Node2",
+				Condition:   func(ctx context.Context, state *State) bool { return false },
+			},
+		},
+	}
+}
+
+func (n *Node5) Run(ctx context.Context, state *State, plan *kflowex.Plan) error {
+	state.AddStep("Node5")
+	return kflowex.Execute(ctx, state, plan, "Node3", "Node4")
+}
+
 type AddMW[S kflowex.IState, D kflowex.IDescription[S]] struct {
 	name   string
 	values *[]string
@@ -228,6 +252,22 @@ func TestFlowNodeCondition(t *testing.T) {
 	assert.NoError(t, engine.Run(context.Background(), state, "Node4"))
 	assert.ElementsMatch(t, []string{"Node1", "Node2", "Node3"}, state.Step[:3])
 	assert.Equal(t, "Node4", state.Step[3])
+}
+
+func TestFlowNodeExecute(t *testing.T) {
+	state := &State{
+		Step: []string{},
+	}
+	engine, err := kflowex.NewFlowBuilder("test", func(f *kflowex.Flow[*State, Description[*State]]) {
+		assert.NoError(t, kflowex.AddNode(f, NewNode1))
+		assert.NoError(t, kflowex.AddNode(f, NewNode2))
+		assert.NoError(t, kflowex.AddNode(f, NewNode3))
+		assert.NoError(t, kflowex.AddNode(f, NewNode4))
+		assert.NoError(t, kflowex.AddNode(f, NewNode5))
+	}).Build()
+	assert.NoError(t, err)
+	assert.NoError(t, engine.Run(context.Background(), state, "Node5"))
+	assert.Equal(t, []string{"Node1", "Node5", "Node2", "Node3", "Node4"}, state.Step)
 }
 
 func TestFlowNodeMiddleware(t *testing.T) {
