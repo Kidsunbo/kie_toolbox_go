@@ -24,11 +24,8 @@ func AddNode[T any](engine *Engine[T], node INode) error {
 
 // ExecuteInSequence will run the targets in the same executor, state and plan, but in a sequential way.
 func ExecuteInSequence[T any](ctx context.Context, state T, plan *Plan, targets ...string) error {
-	executor, okExecutor := plan.executor.(IExecutor[T])
-	nodes, okNodes := plan.nodes.(*container.Dag[string, *nodeBox[T]])
-	if !okExecutor || !okNodes {
-		return errors.New(message(plan.config.Language, typeAssertFailed))
-	}
+	executor := plan.executor.(IExecutor[T])                  // the type must be this type, panic if it's not
+	nodes := plan.nodes.(*container.Dag[string, *nodeBox[T]]) // the type must be this type, panic if it's not
 	if plan.inParallel.Load() {
 		return errors.New((message(plan.config.Language, operationNotSupportedInParallel)))
 	}
@@ -49,11 +46,8 @@ func ExecuteInSequence[T any](ctx context.Context, state T, plan *Plan, targets 
 
 // ExecuteInParallel will run the targets in the same executor, state and plan, but in parallel.
 func ExecuteInParallel[T any](ctx context.Context, state T, plan *Plan, targets ...string) error {
-	executor, okExecutor := plan.executor.(IExecutor[T])
-	nodes, okNodes := plan.nodes.(*container.Dag[string, *nodeBox[T]])
-	if !okExecutor || !okNodes {
-		return errors.New(message(plan.config.Language, typeAssertFailed))
-	}
+	executor := plan.executor.(IExecutor[T])                  // the type must be this type, panic if it's not
+	nodes := plan.nodes.(*container.Dag[string, *nodeBox[T]]) // the type must be this type, panic if it's not
 	if plan.inParallel.Load() {
 		return errors.New((message(plan.config.Language, operationNotSupportedInParallel)))
 	}
@@ -78,7 +72,8 @@ func ExecuteInParallel[T any](ctx context.Context, state T, plan *Plan, targets 
 // RemoveResult will remove the result of the node and all the nodes that depend on it. User can use this function to re-run the node and its descendats.
 //
 // Caution: this function is pretty costly and the previous result will lost, so be careful to use it.
-func RemoveResult[T any](plan *Plan, node string) error {
+func RemoveResult[T any](state T, plan *Plan, node string) error {
+	_ = state // state is only used to infer the type of T
 	if plan.inParallel.Load() {
 		return errors.New((message(plan.config.Language, operationNotSupportedInParallel)))
 	}
@@ -88,10 +83,7 @@ func RemoveResult[T any](plan *Plan, node string) error {
 	} else if node.BoxName != node.OriginalName {
 		return fmt.Errorf(message(plan.config.Language, unsupportedNodeType), node)
 	}
-	nodes, ok := plan.nodes.(*container.Dag[string, *nodeBox[T]])
-	if !ok {
-		return errors.New(message(plan.config.Language, typeAssertFailed))
-	}
+	nodes := plan.nodes.(*container.Dag[string, *nodeBox[T]]) // the type must be this type, panic if it's not
 	for key, result := range plan.finishedNodes {
 		if ok, err := nodes.CanReach(key, node); err != nil {
 			return err
