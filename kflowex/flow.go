@@ -82,3 +82,7 @@ func ExecuteSequentially[T any](ctx context.Context, state T, plan *Plan, target
 func ExecuteParallel[T any](ctx context.Context, state T, plan *Plan, targets ...string) error {
 	return kflow.ExecuteInParallel(ctx, state, plan, targets...)
 }
+
+func RemoveResult[T any](plan *Plan, target string) error {
+	return kflow.RemoveResult[T](plan, target)
+}
