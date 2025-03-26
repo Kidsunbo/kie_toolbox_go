@@ -378,19 +378,19 @@ func NewNodeExecuteInRunType(name string, dep []string) *NodeExecuteInRunTimeTyp
 	}
 }
 
-type NodeResultResultType struct {
+type NodeResultResultType[T any] struct {
 	FlowNode
 	StringDependence
 	removes []string
 }
 
-func (n *NodeResultResultType) Run(ctx context.Context, state *State, plan *Plan) error {
+func (n *NodeResultResultType[T]) Run(ctx context.Context, state *State, plan *Plan) error {
 	state.Lock.Lock()
 	defer state.Lock.Unlock()
 	state.Stamps = append(state.Stamps, n.name)
 	state.ConcurrentInfo = append(state.ConcurrentInfo, plan.InParallel())
 	for _, remove := range n.removes {
-		err := RemoveResult[*State](plan, remove)
+		err := RemoveResult[T](plan, remove)
 		if err != nil {
 			return err
 		}
@@ -398,8 +398,8 @@ func (n *NodeResultResultType) Run(ctx context.Context, state *State, plan *Plan
 	return nil
 }
 
-func NewNodeResultResultType(name string, dep []string, removes []string) *NodeResultResultType {
-	return &NodeResultResultType{
+func NewNodeResultResultType[T any](name string, dep []string, removes []string) *NodeResultResultType[T] {
+	return &NodeResultResultType[T]{
 		FlowNode: FlowNode{
 			name: name,
 		},
@@ -1078,12 +1078,15 @@ func TestRemoveResult(t *testing.T) {
 		node.ConditionalDependence("Type1_8", func(ctx context.Context, s *State) bool { return true }, nil),
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_8", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePanicType("Type1_9", nil)))
 	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
-	assert.NoError(t, AddNode(eng, NewNodeResultResultType("RemoveResult_1", nil, []string{"Type1_1"})))
-	assert.NoError(t, AddNode(eng, NewNodeResultResultType("RemoveResult_2", nil, []string{"Type1_3"})))
-	assert.NoError(t, AddNode(eng, NewNodeResultResultType("RemoveResult_3", nil, []string{"Type1_8_by_Type1_7"})))
-	assert.NoError(t, AddNode(eng, NewNodeResultResultType("RemoveResult_4", nil, []string{"Type1_5"})))
-	assert.NoError(t, AddNode(eng, NewNodeResultResultType("RemoveResult_5", nil, []string{"nothing"})))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType[*State]("RemoveResult_1", nil, []string{"Type1_1"})))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType[*State]("RemoveResult_2", nil, []string{"Type1_3"})))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType[*State]("RemoveResult_3", nil, []string{"Type1_8_by_Type1_7"})))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType[*State]("RemoveResult_4", nil, []string{"Type1_5"})))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType[*State]("RemoveResult_5", nil, []string{"nothing"})))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType[State]("RemoveResult_6", nil, []string{"Type1_1"})))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType[*State]("RemoveResult_7", nil, []string{"Type1_9"})))
 
 	assert.NoError(t, eng.Prepare())
 	// fmt.Println(eng.Dot())
@@ -1240,6 +1243,43 @@ func TestRemoveResult(t *testing.T) {
 	assert.NotContains(t, plan.finishedNodes, "Type1_2")
 	assert.NotContains(t, plan.finishedOriginalNodes, "Type1_2")
 	assert.True(t, plan.finishedNodes["RemoveResult_4"].Success)
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "RemoveResult_6", "PlanExtractor"))
+	assert.Equal(t, []string{"Type1_1", "RemoveResult_6", "PlanExtractor"}, state.Stamps)
+	assert.Equal(t, []bool{false, false, false}, state.ConcurrentInfo)
+	assert.Equal(t, []string{"Type1_1", "RemoveResult_6", "PlanExtractor"}, plan.GetChainNodes())
+	assert.Equal(t, 3, len(plan.finishedNodes))
+	assert.True(t, plan.finishedNodes["Type1_1"].Success)
+	assert.Contains(t, plan.finishedOriginalNodes, "Type1_1")
+	assert.False(t, plan.finishedNodes["RemoveResult_6"].Success)
+	assert.EqualError(t, plan.finishedNodes["RemoveResult_6"].Err, "类型断言失败，请检查类型是否正确")
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_9", "PlanExtractor"))
+	assert.Equal(t, []string{"PlanExtractor"}, state.Stamps)
+	assert.Equal(t, []bool{false}, state.ConcurrentInfo)
+	assert.Equal(t, []string{"Type1_9", "PlanExtractor"}, plan.GetChainNodes())
+	assert.Equal(t, 2, len(plan.finishedNodes))
+	assert.False(t, plan.finishedNodes["Type1_9"].Success)
+	assert.True(t, plan.finishedNodes["Type1_9"].IsPanic)
+	assert.EqualError(t, plan.finishedNodes["Type1_9"].Err, "panic: panic, something wrong")
+	assert.Contains(t, plan.finishedOriginalNodes, "Type1_9")
+	assert.Contains(t, plan.failedNodes, "Type1_9")
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_9", "RemoveResult_7", "PlanExtractor"))
+	assert.Equal(t, []string{"RemoveResult_7", "PlanExtractor"}, state.Stamps)
+	assert.Equal(t, []bool{false, false}, state.ConcurrentInfo)
+	assert.Equal(t, []string{"Type1_9", "RemoveResult_7", "PlanExtractor"}, plan.GetChainNodes())
+	assert.Equal(t, 2, len(plan.finishedNodes))
+	assert.NotContains(t, plan.finishedNodes, "Type1_9")
+	assert.NotContains(t, plan.failedNodes, "Type1_9")
+	assert.NotContains(t, plan.finishedOriginalNodes, "Type1_9")
+	assert.True(t, plan.finishedNodes["RemoveResult_7"].Success)
 	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
 }
 
