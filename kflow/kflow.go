@@ -39,7 +39,7 @@ func ExecuteInSequence[T any](ctx context.Context, state T, plan *Plan, targets 
 	p := plan.copy()
 	p.targetNodes = make(map[string]struct{})
 	p.conditionalTargetNodes = make(map[string]struct{})
-	p.targetsSummary = make([]string, 0)
+	p.targetsSummary = nil
 	p.runningNodes = make(map[string]struct{})
 	p.currentNode = ""
 	p.chainNodes = targets
@@ -64,12 +64,12 @@ func ExecuteInParallel[T any](ctx context.Context, state T, plan *Plan, targets 
 	p := plan.copy()
 	p.targetNodes = make(map[string]struct{})
 	p.conditionalTargetNodes = make(map[string]struct{})
-	p.targetsSummary = make([]string, 0)
+	p.targetsSummary = nil
 	p.runningNodes = make(map[string]struct{})
 	p.currentNode = ""
 	p.chainNodes = []string{targets[0]}
-	if err := p.AddTargetNodes(targets...); err != nil {
-		return err
+	for _, target := range targets[1:] {
+		p.targetNodes[target] = struct{}{}
 	}
 
 	return executor.Execute(ctx, nodes, state, p)

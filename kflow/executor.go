@@ -37,7 +37,7 @@ func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[
 	defer func() {
 		plan.targetNodes = make(map[string]struct{})
 		plan.conditionalTargetNodes = make(map[string]struct{})
-		plan.targetsSummary = make([]string, 0)
+		plan.targetsSummary = nil
 	}()
 
 	tunnel := make(chan *ExecuteResult)
