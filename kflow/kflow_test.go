@@ -378,6 +378,40 @@ func NewNodeExecuteInRunType(name string, dep []string) *NodeExecuteInRunTimeTyp
 	}
 }
 
+type NodeResultResultType struct {
+	FlowNode
+	StringDependence
+	removes []string
+}
+
+func (n *NodeResultResultType) Run(ctx context.Context, state *State, plan *Plan) error {
+	state.Lock.Lock()
+	defer state.Lock.Unlock()
+	state.Stamps = append(state.Stamps, n.name)
+	state.ConcurrentInfo = append(state.ConcurrentInfo, plan.InParallel())
+	for _, remove := range n.removes {
+		err := RemoveResult[*State](plan, remove)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewNodeResultResultType(name string, dep []string, removes []string) *NodeResultResultType {
+	return &NodeResultResultType{
+		FlowNode: FlowNode{
+			name: name,
+		},
+		StringDependence: StringDependence{
+			dependence: dep,
+		},
+		removes: removes,
+	}
+}
+
+// ==================== Test Cases ====================
+
 func TestNormalNodeGraph1(t *testing.T) {
 	node := new(Node[*State])
 
@@ -1023,6 +1057,113 @@ func TestExecuteInRunTimeCheckEmptyBatch(t *testing.T) {
 	assert.False(t, plan.finishedNodes["Operator1_2"].Success)
 	assert.False(t, plan.finishedNodes["Operator1_2"].Skipped)
 	assert.EqualError(t, plan.finishedNodes["Operator1_2"].Err, "没有目标节点可以运行")
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+}
+
+func TestRemoveResult(t *testing.T) {
+	node := new(Node[*State])
+	var plan *Plan
+
+	eng := NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", []string{"Type1_4", "Type1_3"})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", []string{"Type1_4"})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_5"})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", []string{
+		"RemoveResult_1", "RemoveResult_2",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_7", []*Dependence[*State]{
+		node.ConditionalDependence("Type1_8", func(ctx context.Context, s *State) bool { return true }, nil),
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_8", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType("RemoveResult_1", nil, []string{"Type1_1"})))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType("RemoveResult_2", nil, []string{"Type1_3"})))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType("RemoveResult_3", nil, []string{"Type1_8_by_Type1_7"})))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType("RemoveResult_4", nil, []string{"Type1_4"})))
+	assert.NoError(t, AddNode(eng, NewNodeResultResultType("RemoveResult_5", nil, []string{"nothing"})))
+
+	assert.NoError(t, eng.Prepare())
+	// fmt.Println(eng.Dot())
+
+	state := new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "Type1_2", "Type1_6", "PlanExtractor"))
+	assert.Equal(t, []string{"Type1_1", "Type1_5", "Type1_4", "Type1_3", "Type1_2"}, state.Stamps[:5])
+	assert.ElementsMatch(t, []string{"RemoveResult_1", "RemoveResult_2"}, state.Stamps[5:7])
+	assert.Equal(t, []string{"PlanExtractor"}, state.Stamps[7:])
+	assert.Equal(t, []bool{false, false, false, false, false, true, true, false}, state.ConcurrentInfo)
+	assert.Equal(t, []string{"Type1_1", "Type1_2", "Type1_6", "PlanExtractor"}, plan.GetChainNodes())
+	assert.Equal(t, 9, len(plan.finishedNodes))
+	assert.True(t, plan.finishedNodes["Type1_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_2"].Success)
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_4"].Success)
+	assert.True(t, plan.finishedNodes["Type1_5"].Success)
+	assert.False(t, plan.finishedNodes["Type1_6"].Success)
+	assert.True(t, plan.finishedNodes["Type1_6"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type1_6"].Err)
+	assert.False(t, plan.finishedNodes["RemoveResult_1"].Success)
+	assert.False(t, plan.finishedNodes["RemoveResult_1"].Skipped)
+	assert.EqualError(t, plan.finishedNodes["RemoveResult_1"].Err, "操作不支持在并行环境中运行")
+	assert.False(t, plan.finishedNodes["RemoveResult_2"].Success)
+	assert.False(t, plan.finishedNodes["RemoveResult_2"].Skipped)
+	assert.EqualError(t, plan.finishedNodes["RemoveResult_2"].Err, "操作不支持在并行环境中运行")
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "Type1_2", "RemoveResult_1", "PlanExtractor"))
+	assert.Equal(t, []string{"Type1_1", "Type1_5", "Type1_4", "Type1_3", "Type1_2", "RemoveResult_1", "PlanExtractor"}, state.Stamps)
+	assert.Equal(t, []bool{false, false, false, false, false, false, false}, state.ConcurrentInfo)
+	assert.Equal(t, []string{"Type1_1", "Type1_2", "RemoveResult_1", "PlanExtractor"}, plan.GetChainNodes())
+	assert.Equal(t, 6, len(plan.finishedNodes))
+	assert.NotContains(t, plan.finishedNodes, "Type1_1")
+	assert.NotContains(t, plan.finishedOriginalNodes, "Type1_1")
+	assert.True(t, plan.finishedNodes["Type1_2"].Success)
+	assert.Contains(t, plan.finishedOriginalNodes, "Type1_2")
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_4"].Success)
+	assert.True(t, plan.finishedNodes["Type1_5"].Success)
+	assert.True(t, plan.finishedNodes["RemoveResult_1"].Success)
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "Type1_2", "RemoveResult_1", "Type1_1", "PlanExtractor"))
+	assert.Equal(t, []string{"Type1_1", "Type1_5", "Type1_4", "Type1_3", "Type1_2", "RemoveResult_1", "Type1_1", "PlanExtractor"}, state.Stamps)
+	assert.Equal(t, []bool{false, false, false, false, false, false, false, false}, state.ConcurrentInfo)
+	assert.Equal(t, []string{"Type1_1", "Type1_2", "RemoveResult_1", "Type1_1", "PlanExtractor"}, plan.GetChainNodes())
+	assert.Equal(t, 7, len(plan.finishedNodes))
+	assert.True(t, plan.finishedNodes["Type1_1"].Success)
+	assert.Contains(t, plan.finishedOriginalNodes, "Type1_1")
+	assert.True(t, plan.finishedNodes["Type1_2"].Success)
+	assert.Contains(t, plan.finishedOriginalNodes, "Type1_2")
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_4"].Success)
+	assert.True(t, plan.finishedNodes["Type1_5"].Success)
+	assert.True(t, plan.finishedNodes["RemoveResult_1"].Success)
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "Type1_7", "Type1_2", "RemoveResult_5", "RemoveResult_3", "Type1_1", "PlanExtractor"))
+	assert.Equal(t, []string{"Type1_1", "Type1_8", "Type1_7", "Type1_5", "Type1_4", "Type1_3", "Type1_2", "RemoveResult_5", "RemoveResult_3", "PlanExtractor"}, state.Stamps)
+	assert.Equal(t, []bool{false, false, false, false, false, false, false, false, false, false}, state.ConcurrentInfo)
+	assert.Equal(t, []string{"Type1_1", "Type1_7", "Type1_2", "RemoveResult_5", "RemoveResult_3", "Type1_1", "PlanExtractor"}, plan.GetChainNodes())
+	assert.Equal(t, 11, len(plan.finishedNodes))
+	assert.True(t, plan.finishedNodes["Type1_1"].Success)
+	assert.Contains(t, plan.finishedOriginalNodes, "Type1_1")
+	assert.True(t, plan.finishedNodes["Type1_2"].Success)
+	assert.Contains(t, plan.finishedOriginalNodes, "Type1_2")
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_4"].Success)
+	assert.True(t, plan.finishedNodes["Type1_5"].Success)
+	assert.True(t, plan.finishedNodes["Type1_8_by_Type1_7"].Success)
+	assert.True(t, plan.finishedNodes["Type1_7"].Success)
+	assert.True(t, plan.finishedNodes["Type1_8"].Success)
+	assert.False(t, plan.finishedNodes["RemoveResult_5"].Success)
+	assert.EqualError(t, plan.finishedNodes["RemoveResult_5"].Err, "节点[nothing]不存在")
+	assert.False(t, plan.finishedNodes["RemoveResult_3"].Success)
+	assert.EqualError(t, plan.finishedNodes["RemoveResult_3"].Err, "节点[Type1_8_by_Type1_7]的类型不支持")
 	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
 
 }

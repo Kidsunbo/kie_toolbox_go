@@ -22,6 +22,7 @@ const (
 	unsupportedNodeType
 	nodeTimeoutError
 	operationNotSupportedInParallel
+	typeAssertFailed
 	noTargetToRun
 )
 
@@ -35,6 +36,7 @@ var msg = map[textIndexType]languagePack{
 	unsupportedNodeType:             {Chinese: "节点[%v]的类型不支持", English: "the type of node [%v] isn't supported"},
 	nodeTimeoutError:                {Chinese: "节点运行超时", English: "node exeuctes timeout"},
 	operationNotSupportedInParallel: {Chinese: "操作不支持在并行环境中运行", English: "operation is not allowed in parallel"},
+	typeAssertFailed:                {Chinese: "类型断言失败，请检查类型是否正确", English: "type assert failed, please check the type"},
 	noTargetToRun:                   {Chinese: "没有目标节点可以运行", English: "no target node to run"},
 }
 
