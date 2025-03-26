@@ -23,6 +23,7 @@ const (
 	nodeTimeoutError
 	operationNotSupportedInParallel
 	typeAssertFailed
+	noTargetToRun
 )
 
 var msg = map[textIndexType]languagePack{
@@ -36,6 +37,7 @@ var msg = map[textIndexType]languagePack{
 	nodeTimeoutError:                {Chinese: "节点运行超时", English: "node exeuctes timeout"},
 	operationNotSupportedInParallel: {Chinese: "操作不支持在并行环境中运行", English: "operation is not allowed in parallel"},
 	typeAssertFailed:                {Chinese: "类型断言失败，此为框架错误", English: "type assert failed, this is a framework error"},
+	noTargetToRun:                   {Chinese: "没有目标节点可以运行", English: "no target node to run"},
 }
 
 func message(lang int8, text textIndexType) string {
