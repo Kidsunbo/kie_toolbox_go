@@ -141,11 +141,15 @@ type NodeTimeCostType struct {
 }
 
 func (n *NodeTimeCostType) Run(ctx context.Context, state *State, plan *Plan) error {
+	state.Lock.Lock()
+	state.Stamps = append(state.Stamps, n.name)
+	state.ConcurrentInfo = append(state.ConcurrentInfo, plan.InParallel())
+	state.Lock.Unlock()
 	time.Sleep(n.timecost * time.Second)
 	return nil
 }
 
-func NewNodeTimeoutType(name string, dep []*Dependence[*State], timeout int64) *NodeTimeCostType {
+func NewNodeTimeCostType(name string, dep []*Dependence[*State], timeout int64) *NodeTimeCostType {
 	return &NodeTimeCostType{
 		FlowNode: FlowNode{
 			name: name,
@@ -683,18 +687,18 @@ func TestTimeoutAndError(t *testing.T) {
 	var plan *Plan
 
 	state := new(State)
-	eng := NewEngine[*State]("", AsyncTimeout(5))
+	eng := NewEngine[*State]("", AsyncTimeout(1))
 	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_1", []string{
 		"TypeTimeout_1", "TypeTimeout_2",
 	})))
-	assert.NoError(t, AddNode(eng, NewNodeTimeoutType("TypeTimeout_1", []*Dependence[*State]{}, 7)))
-	assert.NoError(t, AddNode(eng, NewNodeTimeoutType("TypeTimeout_2", []*Dependence[*State]{}, 10)))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("TypeTimeout_1", []*Dependence[*State]{}, 2)))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("TypeTimeout_2", []*Dependence[*State]{}, 3)))
 	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
 	assert.NoError(t, eng.Prepare())
 	assert.EqualError(t, eng.Run(context.Background(), state, "PlanExtractor", "Type1_1"), "节点运行超时")
 	now := time.Now()
-	assert.Greater(t, now.Sub(plan.GetStartTime()).Seconds(), 5.0)
-	assert.Less(t, now.Sub(plan.GetStartTime()).Seconds(), 10.0)
+	assert.Greater(t, now.Sub(plan.GetStartTime()).Seconds(), 1.0)
+	assert.Less(t, now.Sub(plan.GetStartTime()).Seconds(), 1.5)
 
 	plan = nil
 	eng = NewEngine[*State]("")
@@ -892,6 +896,67 @@ func TestExecuteInRunTimeCheckParallel(t *testing.T) {
 
 }
 
+func TestExecuteInRunTimeCheckParallelTime(t *testing.T) {
+	var plan *Plan
+
+	state := new(State)
+	eng := NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", []string{
+		"Operator1_1",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", []string{
+		"Operator1_2",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil).WithSequence("Type1_3", "Type1_4").WithSequence("Type1_5", "Type1_6")))
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_2", nil).WithParallel("Type1_3", "Type1_4").WithParallel("Type1_5", "Type1_6", "Type1_7")))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_3", nil, 1)))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_4", nil, 1)))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_5", nil, 1)))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_6", nil, 1)))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_7", nil, 1)))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_8", nil, 1)))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+
+	assert.NoError(t, eng.Prepare())
+	now := time.Now()
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "PlanExtractor"))
+	assert.Equal(t, []bool{false, false, false, false, false, false, false}, state.ConcurrentInfo)
+	assert.Equal(t, []string{"Type1_3", "Type1_4", "Operator1_1", "Type1_5", "Type1_6", "Type1_1", "PlanExtractor"}, state.Stamps)
+	cost := time.Since(now).Seconds()
+	assert.GreaterOrEqual(t, cost, 4.0)
+	assert.LessOrEqual(t, cost, 4.5)
+	assert.Equal(t, 7, len(plan.finishedNodes))
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_4"].Success)
+	assert.True(t, plan.finishedNodes["Type1_5"].Success)
+	assert.True(t, plan.finishedNodes["Type1_6"].Success)
+	assert.True(t, plan.finishedNodes["Type1_1"].Success)
+	assert.True(t, plan.finishedNodes["Operator1_1"].Success)
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+	now = time.Now()
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_2", "PlanExtractor"))
+	assert.Equal(t, []bool{true, true, false, true, true, true, false, false}, state.ConcurrentInfo)
+	assert.ElementsMatch(t, []string{"Type1_3", "Type1_4"}, state.Stamps[:2])
+	assert.Equal(t, "Operator1_2", state.Stamps[2])
+	assert.ElementsMatch(t, []string{"Type1_5", "Type1_6", "Type1_7"}, state.Stamps[3:6])
+	assert.Equal(t, []string{"Type1_2", "PlanExtractor"}, state.Stamps[6:])
+	cost = time.Since(now).Seconds()
+	assert.GreaterOrEqual(t, cost, 2.0)
+	assert.LessOrEqual(t, cost, 2.5)
+	assert.Equal(t, 8, len(plan.finishedNodes))
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_4"].Success)
+	assert.True(t, plan.finishedNodes["Type1_5"].Success)
+	assert.True(t, plan.finishedNodes["Type1_6"].Success)
+	assert.True(t, plan.finishedNodes["Type1_7"].Success)
+	assert.True(t, plan.finishedNodes["Type1_2"].Success)
+	assert.True(t, plan.finishedNodes["Operator1_2"].Success)
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+}
+
 func TestExecuteInRunTimeCheckEmptyBatch(t *testing.T) {
 	var plan *Plan
 
@@ -900,7 +965,7 @@ func TestExecuteInRunTimeCheckEmptyBatch(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", []string{
 		"Operator1_1",
 	})))
-	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", []string {
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", []string{
 		"Operator1_2",
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil).WithSequence().WithParallel("Type1_5", "Type1_6", "Type1_7")))
@@ -926,6 +991,7 @@ func TestExecuteInRunTimeCheckEmptyBatch(t *testing.T) {
 	assert.EqualError(t, plan.finishedNodes["Operator1_1"].Err, "没有目标节点可以运行")
 	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
 
+	state = new(State)
 	assert.NoError(t, eng.Run(context.Background(), state, "Type1_2", "PlanExtractor"))
 	assert.Equal(t, []bool{false}, state.ConcurrentInfo)
 	assert.Equal(t, []string{"PlanExtractor"}, state.Stamps)
