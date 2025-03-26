@@ -75,6 +75,10 @@ func AddNode[S IState, D IDescription[S], T INode[S, D]](flow *Flow[S, D], const
 	return err
 }
 
-func Execute[T any](ctx context.Context, state T, plan *Plan, targets ...string) error {
-	return kflow.Execute(ctx, state, plan, targets...)
+func ExecuteSequentially[T any](ctx context.Context, state T, plan *Plan, targets ...string) error {
+	return kflow.ExecuteInSequence(ctx, state, plan, targets...)
+}
+
+func ExecuteParallel[T any](ctx context.Context, state T, plan *Plan, targets ...string) error {
+	return kflow.ExecuteInParallel(ctx, state, plan, targets...)
 }

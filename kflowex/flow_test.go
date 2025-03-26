@@ -160,7 +160,7 @@ func (n *Node5) Description() Description[*State] {
 
 func (n *Node5) Run(ctx context.Context, state *State, plan *kflowex.Plan) error {
 	state.AddStep("Node5")
-	return kflowex.Execute(ctx, state, plan, "Node3", "Node4")
+	return kflowex.ExecuteSequentially(ctx, state, plan, "Node3", "Node4")
 }
 
 type AddMW[S kflowex.IState, D kflowex.IDescription[S]] struct {

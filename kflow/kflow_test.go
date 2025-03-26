@@ -65,6 +65,7 @@ func (m ConditionDependence) Dependence() []*Dependence[*State] {
 	return m.dependence
 }
 
+// NodeType1 is a basic node with string dependence.
 type NodeType1 struct {
 	BasicNode
 	StringDependence
@@ -81,6 +82,7 @@ func NewNodeType1(name string, dep []string) *NodeType1 {
 	}
 }
 
+// NodeType2 is a basic node with condition dependence.
 type NodeType2 struct {
 	BasicNode
 	ConditionDependence
@@ -97,6 +99,7 @@ func NewNodeType2(name string, dep []*Dependence[*State]) *NodeType2 {
 	}
 }
 
+// NodeType3 is a flow node with string dependence.
 type NodeType3 struct {
 	FlowNode
 	StringDependence
@@ -113,6 +116,7 @@ func NewNodeType3(name string, dep []string) *NodeType3 {
 	}
 }
 
+// NodeType4 is a flow node with condition dependence.
 type NodeType4 struct {
 	FlowNode
 	ConditionDependence
@@ -129,29 +133,31 @@ func NewNodeType4(name string, dep []*Dependence[*State]) *NodeType4 {
 	}
 }
 
-type NodeTimeoutType struct {
+// NodeTimeCostType is a flow node with timeout.
+type NodeTimeCostType struct {
 	FlowNode
 	ConditionDependence
-	timeout time.Duration
+	timecost time.Duration
 }
 
-func (n *NodeTimeoutType) Run(ctx context.Context, state *State, plan *Plan) error {
-	time.Sleep(n.timeout * time.Second)
+func (n *NodeTimeCostType) Run(ctx context.Context, state *State, plan *Plan) error {
+	time.Sleep(n.timecost * time.Second)
 	return nil
 }
 
-func NewNodeTimeoutType(name string, dep []*Dependence[*State], timeout int64) *NodeTimeoutType {
-	return &NodeTimeoutType{
+func NewNodeTimeoutType(name string, dep []*Dependence[*State], timeout int64) *NodeTimeCostType {
+	return &NodeTimeCostType{
 		FlowNode: FlowNode{
 			name: name,
 		},
 		ConditionDependence: ConditionDependence{
 			dependence: dep,
 		},
-		timeout: time.Duration(timeout),
+		timecost: time.Duration(timeout),
 	}
 }
 
+// NodeErrorType is a basic node with error.
 type NodeErrorType struct {
 	BasicNode
 	StringDependence
@@ -172,6 +178,7 @@ func NewNodeErrorType(name string, dep []string) *NodeErrorType {
 	}
 }
 
+// NodePanicType is a basic node with panic.
 type NodePanicType struct {
 	BasicNode
 	StringDependence
@@ -192,6 +199,7 @@ func NewNodePanicType(name string, dep []string) *NodePanicType {
 	}
 }
 
+// NodeStopType is a flow node to stop the plan.
 type NodeStopType struct {
 	FlowNode
 	StringDependence
@@ -217,6 +225,7 @@ func NewNodeStopType(name string, dep []string) *NodeStopType {
 	}
 }
 
+// NodePlanExtractor is a flow node to extract the plan.
 type NodePlanExtractor struct {
 	plan **Plan
 	FlowNode
@@ -245,6 +254,7 @@ func NewNodePlanExtractor(name string, dep []string, plan **Plan) *NodePlanExtra
 	}
 }
 
+// NodeAddNodeType is a flow node to add target nodes.
 type NodeAddNodeType struct {
 	FlowNode
 	StringDependence
@@ -271,6 +281,7 @@ func NewNodeAddNodeType(name string, dep []string, nodes []string) *NodeAddNodeT
 	}
 }
 
+// NodePlanOperatorType is a flow node to operate the plan.
 type NodePlanOperatorType struct {
 	FlowNode
 	StringDependence
@@ -307,42 +318,59 @@ func NewNodePlanOperatorType(name string, dep []string) *NodePlanOperatorType {
 	}
 }
 
-type NodeExecuteInRunType struct {
+// NodeExecuteInRunTimeType is a flow node to execute in run time. It will run first batch in sequence and second batch in parallel.
+type NodeExecuteInRunTimeType struct {
 	FlowNode
 	StringDependence
-	firstBatch  []string
-	secondBatch []string
+	batches  [][]string
+	parallel []bool
 }
 
-func (n *NodeExecuteInRunType) Run(ctx context.Context, state *State, plan *Plan) error {
+func (n *NodeExecuteInRunTimeType) WithSequence(batch ...string) *NodeExecuteInRunTimeType {
+	n.batches = append(n.batches, batch)
+	n.parallel = append(n.parallel, false)
+	return n
+}
 
-	err := Execute(ctx, state, plan, n.firstBatch...)
-	if err != nil {
-		return err
-	}
+func (n *NodeExecuteInRunTimeType) WithParallel(batch ...string) *NodeExecuteInRunTimeType {
+	n.batches = append(n.batches, batch)
+	n.parallel = append(n.parallel, true)
+	return n
+}
 
-	state.Lock.Lock()
-	state.Stamps = append(state.Stamps, n.name)
-	state.Lock.Unlock()
+func (n *NodeExecuteInRunTimeType) Run(ctx context.Context, state *State, plan *Plan) error {
 
-	err = Execute(ctx, state, plan, n.secondBatch...)
-	if err != nil {
-		return err
+	for i, batch := range n.batches {
+		if i != 0 {
+			state.Lock.Lock()
+			state.Stamps = append(state.Stamps, n.name)
+			state.ConcurrentInfo = append(state.ConcurrentInfo, plan.InParallel())
+			state.Lock.Unlock()
+		}
+		if n.parallel[i] {
+			err := ExecuteInParallel(ctx, state, plan, batch...)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := ExecuteInSequence(ctx, state, plan, batch...)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
 }
 
-func NewNodeExecuteInRunType(name string, dep []string, firstBatch, secondBatch []string) *NodeExecuteInRunType {
-	return &NodeExecuteInRunType{
+func NewNodeExecuteInRunType(name string, dep []string) *NodeExecuteInRunTimeType {
+	return &NodeExecuteInRunTimeType{
 		FlowNode: FlowNode{
 			name: name,
 		},
 		StringDependence: StringDependence{
 			dependence: dep,
 		},
-		firstBatch:  firstBatch,
-		secondBatch: secondBatch,
 	}
 }
 
@@ -763,7 +791,7 @@ func TestParallelFlowNode(t *testing.T) {
 
 }
 
-func TestExecuteInRun(t *testing.T) {
+func TestExecuteInRunTime(t *testing.T) {
 	var plan *Plan
 
 	state := new(State)
@@ -772,7 +800,7 @@ func TestExecuteInRun(t *testing.T) {
 		"Operator1_1",
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
-	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil, []string{"Type1_3", "Type1_5"}, []string{"Type1_4"})))
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil).WithSequence("Type1_3", "Type1_5").WithParallel("Type1_4")))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", []string{"Type1_6"})))
@@ -802,7 +830,7 @@ func TestExecuteInRun(t *testing.T) {
 		"Type1_2",
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
-	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil, []string{"Type1_3", "Type1_5"}, []string{"Type1_4"})))
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil).WithSequence("Type1_3", "Type1_5").WithParallel("Type1_4")))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", []string{"Type1_6"})))
@@ -823,6 +851,93 @@ func TestExecuteInRun(t *testing.T) {
 	assert.False(t, plan.finishedNodes["Type1_1"].Success)
 	assert.True(t, plan.finishedNodes["Type1_1"].Skipped)
 	assert.NoError(t, plan.finishedNodes["Type1_1"].Err)
+
+}
+
+func TestExecuteInRunTimeCheckParallel(t *testing.T) {
+	var plan *Plan
+
+	state := new(State)
+	eng := NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", []string{
+		"Operator1_1",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil).WithSequence("Type1_2", "Type1_4").WithParallel("Type1_5", "Type1_6", "Type1_7")))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_3"})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_7", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+
+	assert.NoError(t, eng.Prepare())
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "PlanExtractor"))
+	assert.Equal(t, []bool{false, false, false, false, true, true, true, false, false}, state.ConcurrentInfo)
+	assert.Equal(t, 9, len(state.Stamps))
+	assert.Equal(t, []string{"Type1_2", "Type1_3", "Type1_4", "Operator1_1"}, state.Stamps[0:4])
+	assert.ElementsMatch(t, []string{"Type1_5", "Type1_6", "Type1_7"}, state.Stamps[4:7])
+	assert.Equal(t, []string{"Type1_1", "PlanExtractor"}, state.Stamps[7:])
+	assert.Equal(t, 9, len(plan.finishedNodes))
+	assert.Equal(t, []string{"Type1_1", "PlanExtractor"}, plan.GetChainNodes())
+	assert.True(t, plan.finishedNodes["Type1_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_2"].Success)
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_4"].Success)
+	assert.True(t, plan.finishedNodes["Type1_5"].Success)
+	assert.True(t, plan.finishedNodes["Type1_6"].Success)
+	assert.True(t, plan.finishedNodes["Operator1_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_7"].Success)
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+}
+
+func TestExecuteInRunTimeCheckEmptyBatch(t *testing.T) {
+	var plan *Plan
+
+	state := new(State)
+	eng := NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", []string{
+		"Operator1_1",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", []string {
+		"Operator1_2",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil).WithSequence().WithParallel("Type1_5", "Type1_6", "Type1_7")))
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_2", nil).WithParallel().WithParallel("Type1_5", "Type1_6", "Type1_7")))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_3"})))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_7", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+
+	assert.NoError(t, eng.Prepare())
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "PlanExtractor"))
+	assert.Equal(t, []bool{false}, state.ConcurrentInfo)
+	assert.Equal(t, []string{"PlanExtractor"}, state.Stamps)
+	assert.Equal(t, 3, len(plan.finishedNodes))
+	assert.Equal(t, []string{"Type1_1", "PlanExtractor"}, plan.GetChainNodes())
+	assert.False(t, plan.finishedNodes["Type1_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_1"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type1_1"].Err)
+	assert.False(t, plan.finishedNodes["Operator1_1"].Success)
+	assert.False(t, plan.finishedNodes["Operator1_1"].Skipped)
+	assert.EqualError(t, plan.finishedNodes["Operator1_1"].Err, "没有目标节点可以运行")
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_2", "PlanExtractor"))
+	assert.Equal(t, []bool{false}, state.ConcurrentInfo)
+	assert.Equal(t, []string{"PlanExtractor"}, state.Stamps)
+	assert.Equal(t, 3, len(plan.finishedNodes))
+	assert.Equal(t, []string{"Type1_2", "PlanExtractor"}, plan.GetChainNodes())
+	assert.False(t, plan.finishedNodes["Type1_2"].Success)
+	assert.True(t, plan.finishedNodes["Type1_2"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type1_2"].Err)
+	assert.False(t, plan.finishedNodes["Operator1_2"].Success)
+	assert.False(t, plan.finishedNodes["Operator1_2"].Skipped)
+	assert.EqualError(t, plan.finishedNodes["Operator1_2"].Err, "没有目标节点可以运行")
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
 
 }
 
