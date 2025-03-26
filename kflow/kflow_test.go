@@ -827,7 +827,6 @@ func TestExecuteInRunTime(t *testing.T) {
 	assert.True(t, plan.finishedNodes["Type1_6"].Success)
 	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
 
-	state = new(State)
 	eng = NewEngine[*State]("")
 	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_1", []string{
 		"Operator1_1",
@@ -835,14 +834,21 @@ func TestExecuteInRunTime(t *testing.T) {
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_1", nil).WithSequence("Type1_3", "Type1_5").WithParallel("Type1_4")))
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1_2", nil).WithParallel("Type1_3", "Type1_5").WithSequence("Type1_4")))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", []string{"Type1_6"})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_7", nil)))
-	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_8", []string{
+		"Operator1_2",
+		"Type1_2",
+	})))
 
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
 	assert.NoError(t, eng.Prepare())
+
+	state = new(State)
 	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "PlanExtractor"))
 	assert.Equal(t, 2, len(state.Stamps))
 	assert.Equal(t, []string{"Type1_2", "PlanExtractor"}, state.Stamps)
@@ -855,6 +861,20 @@ func TestExecuteInRunTime(t *testing.T) {
 	assert.False(t, plan.finishedNodes["Type1_1"].Success)
 	assert.True(t, plan.finishedNodes["Type1_1"].Skipped)
 	assert.NoError(t, plan.finishedNodes["Type1_1"].Err)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_8", "PlanExtractor"))
+	assert.Equal(t, 2, len(state.Stamps))
+	assert.Equal(t, []string{"Type1_2", "PlanExtractor"}, state.Stamps)
+	assert.Equal(t, 4, len(plan.finishedNodes))
+	assert.Equal(t, []string{"Type1_8", "PlanExtractor"}, plan.GetChainNodes())
+	assert.True(t, plan.finishedNodes["Type1_2"].Success)
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+	assert.False(t, plan.finishedNodes["Operator1_2"].Success)
+	assert.Error(t, errors.New("操作不支持在并行环境中运行"), plan.finishedNodes["Operator1_2"].Err)
+	assert.False(t, plan.finishedNodes["Type1_8"].Success)
+	assert.True(t, plan.finishedNodes["Type1_8"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type1_8"].Err)
 
 }
 
