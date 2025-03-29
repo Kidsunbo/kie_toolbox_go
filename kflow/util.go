@@ -9,13 +9,15 @@ func contains[K comparable, T any](m map[K]T, key K) bool {
 	return exist
 }
 
-func safeRun(f func() error) (err error, isPanic bool) {
-	defer func() {
-		if e := recover(); e != nil {
-			err = fmt.Errorf("panic: %v", e)
-			isPanic = true
-		}
-	}()
+func safeRun(config *config, f func() error) (err error, isPanic bool) {
+	if config.SafeRun {
+		defer func() {
+			if e := recover(); e != nil {
+				err = fmt.Errorf("panic: %v", e)
+				isPanic = true
+			}
+		}()
+	}
 
 	err = f()
 	return

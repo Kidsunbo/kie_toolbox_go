@@ -169,7 +169,7 @@ func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *nodeBox[T], stat
 		ExecuteBy:     plan.currentNode,
 	}
 
-	err, isPanic := safeRun(func() error {
+	err, isPanic := safeRun(plan.config, func() error {
 		if basicNode, ok := node.Node.(IBasicNode[T]); ok {
 			err := basicNode.Run(ctx, state)
 			if err != nil {
@@ -253,7 +253,7 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 		}
 
 		var pass bool
-		err, isPanic := safeRun(func() error {
+		err, isPanic := safeRun(plan.config, func() error {
 			pass = node.Condition(ctx, state)
 			return nil
 		})

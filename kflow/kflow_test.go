@@ -586,14 +586,16 @@ func TestNormalNodeGraph4(t *testing.T) {
 func TestNormalNodeGraph5(t *testing.T) {
 	node := new(Node[*State])
 
-	eng := NewEngine[*State]("")
+	var plan *Plan
+
+	eng := NewEngine[*State]("", SafeRun)
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_1"})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", []string{"Type1_6"})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", nil)))
-
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
 	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependence[*State]{
 		node.StaticDependence("Type1_3"),
 		node.ConditionalDependence("Type1_5", func(ctx context.Context, s *State) bool { panic("") }, []string{"Type1_2"}),
@@ -611,19 +613,81 @@ func TestNormalNodeGraph5(t *testing.T) {
 	assert.Equal(t, []bool{false}, state.ConcurrentInfo)
 
 	state = new(State)
-	assert.NoError(t, eng.Run(context.Background(), state, "Type2_1"))
+	assert.NoError(t, eng.Run(context.Background(), state, "Type2_1", "PlanExtractor"))
 	assert.ElementsMatch(t, []string{"Type1_2", "Type1_3"}, state.Stamps[0:2])
-	assert.Equal(t, []bool{true, true}, state.ConcurrentInfo)
+	assert.Equal(t, []bool{true, true, false}, state.ConcurrentInfo)
+	assert.True(t, plan.finishedNodes["Type1_5_by_Type2_1"].IsPanic)
+	assert.NotContains(t, plan.finishedNodes, "Type1_5")
 
 	state = new(State)
-	assert.NoError(t, eng.Run(context.Background(), state, "Type2_2"))
-	assert.Equal(t, 3, len(state.Stamps))
-	assert.Equal(t, 3, len(state.ConcurrentInfo))
+	assert.NoError(t, eng.Run(context.Background(), state, "Type2_2", "PlanExtractor"))
+	assert.Equal(t, 4, len(state.Stamps))
+	assert.Equal(t, 4, len(state.ConcurrentInfo))
 	assert.ElementsMatch(t, []string{"Type1_1", "Type1_2", "Type1_4"}, state.Stamps[0:3])
 	assert.Equal(t, []bool{true, true}, state.ConcurrentInfo[:2])
+	assert.True(t, plan.finishedNodes["Type2_1_by_Type2_2"].IsPanic)
+	assert.NotContains(t, plan.finishedNodes, "Type2_1")
 }
 
 func TestNormalNodeGraph6(t *testing.T) {
+	var plan *Plan
+
+	eng := NewEngine[*State]("", SafeRun)
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePanicType("Type1_3", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_3"})))
+	assert.NoError(t, AddNode(eng, NewNodePanicType("Type1_5", []string{"Type1_3"})))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+
+	assert.NoError(t, eng.Prepare())
+	// fmt.Println(eng.Dot())
+
+	state := new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1"))
+	assert.Equal(t, []string{"Type1_1"}, state.Stamps)
+	assert.Equal(t, []bool{false}, state.ConcurrentInfo)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_3", "Type1_2", "PlanExtractor"))
+	assert.Equal(t, []string{"Type1_2", "PlanExtractor"}, state.Stamps)
+	assert.Equal(t, []bool{false, false}, state.ConcurrentInfo)
+	assert.False(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_3"].IsPanic)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_4", "Type1_2", "Type1_5", "PlanExtractor"))
+	assert.Equal(t, []string{"Type1_2", "PlanExtractor"}, state.Stamps)
+	assert.Equal(t, []bool{false, false}, state.ConcurrentInfo)
+	assert.False(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_3"].IsPanic)
+	assert.False(t, plan.finishedNodes["Type1_4"].Success)
+	assert.True(t, plan.finishedNodes["Type1_4"].Skipped)
+	assert.Equal(t, "节点[Type1_4]存在执行失败的依赖节点[Type1_3]", plan.finishedNodes["Type1_4"].SkippedReason)
+	assert.False(t, plan.finishedNodes["Type1_4"].IsPanic)
+	assert.False(t, plan.finishedNodes["Type1_5"].Success)
+	assert.True(t, plan.finishedNodes["Type1_5"].Skipped)
+	assert.Equal(t, "节点[Type1_5]存在执行失败的依赖节点[Type1_3]", plan.finishedNodes["Type1_5"].SkippedReason)
+	assert.False(t, plan.finishedNodes["Type1_5"].IsPanic)
+
+
+	eng = NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePanicType("Type1_3", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_3"})))
+	assert.NoError(t, AddNode(eng, NewNodePanicType("Type1_5", []string{"Type1_3"})))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+
+	assert.NoError(t, eng.Prepare())
+	assert.Panics(t, func() {
+		state = new(State)
+		assert.NoError(t, eng.Run(context.Background(), state, "Type1_3", "Type1_2", "PlanExtractor"))
+	})
+
+}
+
+func TestNormalNodeGraph7(t *testing.T) {
 	node := new(Node[*State])
 
 	var plan *Plan
@@ -1065,7 +1129,7 @@ func TestRemoveResult(t *testing.T) {
 	node := new(Node[*State])
 	var plan *Plan
 
-	eng := NewEngine[*State]("")
+	eng := NewEngine[*State]("", SafeRun)
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", []string{"Type1_4", "Type1_3"})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", []string{"Type1_4"})))

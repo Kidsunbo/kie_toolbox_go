@@ -23,6 +23,7 @@ func NewEngine[T any](name string, params ...any) *Engine[T] {
 		Name:     name,
 		Language: chinese,
 		Timeout:  30,
+		SafeRun:  false,
 	}
 	for _, param := range params {
 		if v, ok := param.(flag); ok {
@@ -30,6 +31,8 @@ func NewEngine[T any](name string, params ...any) *Engine[T] {
 				config.Language = chinese
 			} else if v == ReportInEnglish {
 				config.Language = english
+			} else if v == SafeRun {
+				config.SafeRun = true
 			}
 		} else if v, ok := param.(AsyncTimeout); ok {
 			config.Timeout = time.Duration(v)
