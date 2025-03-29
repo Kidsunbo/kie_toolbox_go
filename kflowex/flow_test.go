@@ -193,6 +193,23 @@ func (n *Node6) Run(ctx context.Context, state *State, plan *kflowex.Plan) error
 	return nil
 }
 
+type Node7 struct{}
+
+func NewNode7() *Node7 {
+	return &Node7{}
+}
+
+func (n *Node7) Description() Description[*State] {
+	return Description[*State]{
+		Name: "Node7",
+	}
+}
+
+func (n *Node7) Run(ctx context.Context, state *State, plan *kflowex.Plan) error {
+	state.AddStep("Node7")
+	panic("test panic")
+}
+
 type AddMW[S kflowex.IState, D kflowex.IDescription[S]] struct {
 	name   string
 	values *[]string
@@ -205,7 +222,6 @@ func (a *AddMW[S, D]) Before(desc D) {
 func (a *AddMW[S, D]) After(desc D, err error) {
 	*a.values = append(*a.values, fmt.Sprintf("a_%v", a.name))
 }
-
 
 func RunMWFunc[S kflowex.IState, D kflowex.IDescription[S]](name string) kflowex.RunMiddleware[S, D] {
 	return func(next kflowex.RunEndpoint[S, D]) kflowex.RunEndpoint[S, D] {
@@ -356,4 +372,39 @@ func TestFlowNodeMiddleware(t *testing.T) {
 	assert.Equal(t, 15, len(state.Step))
 	assert.ElementsMatch(t, []string{"b_runMW1", "b_runMW2", "Node1", "a_runMW2", "a_runMW1", "b_runMW1", "b_runMW2", "Node2", "a_runMW2", "a_runMW1"}, state.Step[:10])
 	assert.Equal(t, []string{"b_runMW1", "b_runMW2", "Node3", "a_runMW2", "a_runMW1"}, state.Step[10:15])
+}
+
+func TestOptions(t *testing.T) {
+	state := &State{
+		Step: []string{},
+	}
+	engine, err := kflowex.NewFlowBuilder("test", func(f *kflowex.Flow[*State, Description[*State]]) {
+		assert.NoError(t, kflowex.AddNode(f, NewNode1))
+		assert.NoError(t, kflowex.AddNode(f, NewNode2))
+		assert.NoError(t, kflowex.AddNode(f, NewNode3))
+		assert.NoError(t, kflowex.AddNode(f, NewNode4))
+		assert.NoError(t, kflowex.AddNode(f, NewNode5))
+		assert.NoError(t, kflowex.AddNode(f, NewNode6))
+		assert.NoError(t, kflowex.AddNode(f, NewNode7))
+	}).WithReportInEnglish().WithSafeRun().WithAsyncTimeout(10).Build()
+	assert.NoError(t, err)
+	assert.NoError(t, engine.Run(context.Background(), state, "Node7"))
+	assert.Equal(t, 1, len(state.Step))
+	assert.Equal(t, "Node7", state.Step[0])
+
+	assert.EqualError(t, engine.Run(context.Background(), state, "Node8"), "node [Node8] does not exist")
+
+	engine, err = kflowex.NewFlowBuilder("test", func(f *kflowex.Flow[*State, Description[*State]]) {
+		assert.NoError(t, kflowex.AddNode(f, NewNode1))
+		assert.NoError(t, kflowex.AddNode(f, NewNode2))
+		assert.NoError(t, kflowex.AddNode(f, NewNode3))
+		assert.NoError(t, kflowex.AddNode(f, NewNode4))
+		assert.NoError(t, kflowex.AddNode(f, NewNode5))
+		assert.NoError(t, kflowex.AddNode(f, NewNode6))
+		assert.NoError(t, kflowex.AddNode(f, NewNode7))
+	}).WithReportInEnglish().WithAsyncTimeout(10).Build()
+	assert.NoError(t, err)
+	assert.Panics(t, func() {
+		engine.Run(context.Background(), state, "Node7")
+	})
 }
