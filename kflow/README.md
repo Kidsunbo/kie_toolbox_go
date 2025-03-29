@@ -13,7 +13,7 @@ go get github.com/Kidsunbo/kie_toolbox_go/kflow@latest
 ```go
 engine := kflow.NewEngine("name")
 ```
-There are several config parameters can be passed into the constructor. `ReportInEnglish` and `ReportInChinese` will determine the language of error message report by the engine. `AsyncTimeout` specifies the timeout of concurrent execution. Notice that, if the node is not running in parallel, it has no timeout control.
+There are several config parameters can be passed into the constructor. `ReportInEnglish` and `ReportInChinese` will determine the language of error message report by the engine. `AsyncTimeout` specifies the timeout of concurrent execution. Notice that, if the node is not running in parallel, it has no timeout control. `SafeRun` will control if a panic should be transfered into an error if panic happens in the node.
 
 
 #### Add Node
