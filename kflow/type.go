@@ -57,7 +57,7 @@ type ExecuteResult struct {
 	Node          INode     // the node object that is for some flow nodes to use
 	Success       bool      // if this execution is successful, which means the run method does not return error
 	Err           error     // if the execution is failed, the error message
-	IsPanic       bool      // if the execution is panic. The panic will be recovered, user can use this field to detect if there is a panic
+	IsPanic       bool      // if the execution is panic. The panic will be recovered when SafeRun is enabled, user can use this field to detect if there is a panic. If SafeRun is disabled, this field will always be false.
 	RunInParallel bool      // if the node is running in parallel.
 	Skipped       bool      // if the node is skipped
 	SkippedReason string    // if the node is skipped, this field indicates the reason
@@ -142,7 +142,7 @@ func (p *Plan) Stop() {
 }
 
 // copy will copy plan manually.
-func (p *Plan) copy() *Plan{
+func (p *Plan) copy() *Plan {
 	plan := &Plan{
 		config:                 p.config,
 		executor:               p.executor,
