@@ -9,7 +9,7 @@ import (
 
 type nodeWrapper[S IState, D IDescription[S], T INode[S, D]] struct {
 	kflow.Node[S]
-	mw          []IRunMiddleware[S, D]
+	handler     RunEndpoint[S, D]
 	node        T
 	constructor func() T
 }
@@ -32,33 +32,33 @@ func (n *nodeWrapper[S, D, T]) Dependence() []*kflow.Dependence[S] {
 }
 
 func (n *nodeWrapper[S, D, T]) Run(ctx context.Context, state S, plan *Plan) error {
+	return n.handler(ctx, n.node.Description(), state, plan)
+}
+
+func (n *nodeWrapper[S, D, T]) terminalHandler(ctx context.Context, desc D, state S, plan *Plan) error {
+	_ = desc
 	v := n.constructor()
-	desc := v.Description()
-
-	for i := 0; i < len(n.mw); i++ {
-		n.mw[i].Before(ctx, desc, state, plan)
-	}
-
-	var err error
 	if value, ok := any(v).(kflow.IBasicNode[S]); ok {
-		err = value.Run(ctx, state)
+		return value.Run(ctx, state)
 	} else if value, ok := any(v).(kflow.IFlowNode[S]); ok {
-		err = value.Run(ctx, state, plan)
+		return value.Run(ctx, state, plan)
 	} else {
 		return errors.New("not supported")
 	}
-
-	for i := len(n.mw) - 1; i >= 0; i-- {
-		n.mw[i].After(ctx, desc, state, plan, err)
-	}
-	return err
 }
 
-func wrap[S any, D IDescription[S], T INode[S, D]](constructor func() T, mw []IRunMiddleware[S, D]) *nodeWrapper[S, D, T] {
-	node := constructor()
-	return &nodeWrapper[S, D, T]{
-		mw:          mw,
-		node:        node,
+func wrap[S any, D IDescription[S], T INode[S, D]](constructor func() T, mw []RunMiddleware[S, D]) *nodeWrapper[S, D, T] {
+	w := &nodeWrapper[S, D, T]{
+		node:        constructor(),
 		constructor: constructor,
 	}
+	w.handler = chain[S, D, T](w.terminalHandler, mw)
+	return w
+}
+
+func chain[S any, D IDescription[S], T INode[S, D]](handler RunEndpoint[S, D], mw []RunMiddleware[S, D]) RunEndpoint[S, D] {
+	for i := len(mw) - 1; i >= 0; i-- {
+		handler = mw[i](handler)
+	}
+	return handler
 }
