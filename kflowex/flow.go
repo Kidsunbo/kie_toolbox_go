@@ -7,10 +7,13 @@ import (
 )
 
 type flowBuilder[S IState, D IDescription[S]] struct {
-	name         string
-	nodeRegister func(*Flow[S, D])
-	runMW        []RunMiddleware[S, D]
-	addMW        []IAddMiddleware[S, D]
+	name            string
+	nodeRegister    func(*Flow[S, D])
+	runMW           []RunMiddleware[S, D]
+	addMW           []IAddMiddleware[S, D]
+	safeRun         bool
+	reportInEnglish bool
+	asyncTimeout    int64
 }
 
 func NewFlowBuilder[S IState, D IDescription[S]](name string, nodeRegister func(*Flow[S, D])) *flowBuilder[S, D] {
@@ -30,9 +33,35 @@ func (f *flowBuilder[S, D]) WithRunMiddleware(mw ...RunMiddleware[S, D]) *flowBu
 	return f
 }
 
+func (f *flowBuilder[S, D]) WithSafeRun() *flowBuilder[S, D] {
+	f.safeRun = true
+	return f
+}
+
+func (f *flowBuilder[S, D]) WithReportInEnglish() *flowBuilder[S, D] {
+	f.reportInEnglish = true
+	return f
+}
+
+func (f *flowBuilder[S, D]) WithAsyncTimeout(asyncTimeout int64) *flowBuilder[S, D] {
+	f.asyncTimeout = asyncTimeout
+	return f
+}
+
 func (f *flowBuilder[S, D]) Build() (*Flow[S, D], error) {
+	options := make([]any, 0)
+	if f.safeRun {
+		options = append(options, kflow.SafeRun)
+	}
+	if f.reportInEnglish {
+		options = append(options, kflow.ReportInEnglish)
+	}
+	if f.asyncTimeout > 0 {
+		options = append(options, kflow.AsyncTimeout(f.asyncTimeout))
+	}
+
 	flow := &Flow[S, D]{
-		engine: kflow.NewEngine[S](f.name),
+		engine: kflow.NewEngine[S](f.name, options...),
 		runMW:  f.runMW,
 		addMW:  f.addMW,
 	}
