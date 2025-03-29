@@ -27,10 +27,9 @@ type INode[S any, D IDescription[S]] interface {
 
 type IState any
 
-type IRunMiddleware[S IState, D IDescription[S]] interface {
-	Before(ctx context.Context, desc D, state S, plan *Plan)
-	After(ctx context.Context, desc D, state S, plan *Plan, err error)
-}
+type RunEndpoint[S IState, D IDescription[S]] func(ctx context.Context, desc D, state S, plan *Plan) error
+
+type RunMiddleware[S IState, D IDescription[S]] func(next RunEndpoint[S, D]) RunEndpoint[S, D]
 
 type IAddMiddleware[S IState, D IDescription[S]] interface {
 	Before(desc D)

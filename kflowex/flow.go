@@ -9,7 +9,7 @@ import (
 type flowBuilder[S IState, D IDescription[S]] struct {
 	name         string
 	nodeRegister func(*Flow[S, D])
-	runMW        []IRunMiddleware[S, D]
+	runMW        []RunMiddleware[S, D]
 	addMW        []IAddMiddleware[S, D]
 }
 
@@ -25,7 +25,7 @@ func (f *flowBuilder[S, D]) WithAddMiddleware(mw ...IAddMiddleware[S, D]) *flowB
 	return f
 }
 
-func (f *flowBuilder[S, D]) WithRunMiddleware(mw ...IRunMiddleware[S, D]) *flowBuilder[S, D] {
+func (f *flowBuilder[S, D]) WithRunMiddleware(mw ...RunMiddleware[S, D]) *flowBuilder[S, D] {
 	f.runMW = append(f.runMW, mw...)
 	return f
 }
@@ -46,7 +46,7 @@ func (f *flowBuilder[S, D]) Build() (*Flow[S, D], error) {
 
 type Flow[S IState, D IDescription[S]] struct {
 	engine *kflow.Engine[S]
-	runMW  []IRunMiddleware[S, D]
+	runMW  []RunMiddleware[S, D]
 	addMW  []IAddMiddleware[S, D]
 }
 

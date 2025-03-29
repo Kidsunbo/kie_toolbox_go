@@ -206,16 +206,16 @@ func (a *AddMW[S, D]) After(desc D, err error) {
 	*a.values = append(*a.values, fmt.Sprintf("a_%v", a.name))
 }
 
-type RunMW[S kflowex.IState, D kflowex.IDescription[S]] struct {
-	name string
-}
 
-func (a *RunMW[S, D]) Before(ctx context.Context, desc D, state S, plan *kflowex.Plan) {
-	any(state).(*State).AddStep(fmt.Sprintf("b_%v", a.name))
-}
-
-func (a *RunMW[S, D]) After(ctx context.Context, desc D, state S, plan *kflowex.Plan, err error) {
-	any(state).(*State).AddStep(fmt.Sprintf("a_%v", a.name))
+func RunMWFunc[S kflowex.IState, D kflowex.IDescription[S]](name string) kflowex.RunMiddleware[S, D] {
+	return func(next kflowex.RunEndpoint[S, D]) kflowex.RunEndpoint[S, D] {
+		return func(ctx context.Context, desc D, state S, plan *kflowex.Plan) error {
+			any(state).(*State).AddStep(fmt.Sprintf("b_%v", name))
+			err := next(ctx, desc, state, plan)
+			any(state).(*State).AddStep(fmt.Sprintf("a_%v", name))
+			return err
+		}
+	}
 }
 
 func TestFlowAddNodeSuccess(t *testing.T) {
@@ -340,12 +340,8 @@ func TestFlowNodeMiddleware(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"b_addMW1", "b_addMW2", "a_addMW2", "a_addMW1", "b_addMW1", "b_addMW2", "a_addMW2", "a_addMW1", "b_addMW1", "b_addMW2", "a_addMW2", "a_addMW1"}, step)
 
-	runMW1 := &RunMW[*State, Description[*State]]{
-		name: "runMW1",
-	}
-	runMW2 := &RunMW[*State, Description[*State]]{
-		name: "runMW2",
-	}
+	runMW1 := RunMWFunc[*State, Description[*State]]("runMW1")
+	runMW2 := RunMWFunc[*State, Description[*State]]("runMW2")
 	engine, err := kflowex.NewFlowBuilder("test", func(f *kflowex.Flow[*State, Description[*State]]) {
 		assert.NoError(t, kflowex.AddNode(f, NewNode1))
 		assert.NoError(t, kflowex.AddNode(f, NewNode2))
