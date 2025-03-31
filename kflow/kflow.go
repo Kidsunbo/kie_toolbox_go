@@ -47,16 +47,12 @@ func ExecuteInSequence[T any](ctx context.Context, state T, plan *Plan, targets 
 	}
 
 	err := executor.Execute(ctx, nodes, state, p)
-	if err != nil {
-		return err
-	}
-
 	for k, node := range p.finishedNodes {
 		if _, exist := beforeExecuteFinishedNodes[k]; !exist {
 			node.ExecuteBy = currentNode
 		}
 	}
-	return nil
+	return err
 }
 
 // ExecuteInParallel will run the targets in the same executor, state and plan, but in parallel.
@@ -86,16 +82,12 @@ func ExecuteInParallel[T any](ctx context.Context, state T, plan *Plan, targets 
 		beforeExecuteFinishedNodes[k] = v
 	}
 	err := executor.Execute(ctx, nodes, state, p)
-	if err != nil {
-		return err
-	}
-
 	for k, node := range p.finishedNodes {
 		if _, exist := beforeExecuteFinishedNodes[k]; !exist {
 			node.ExecuteBy = currentNode
 		}
 	}
-	return nil
+	return err
 }
 
 // RemoveResult will remove the result of the node and all the nodes that depend on it. User can use this function to re-run the node and its descendats.
