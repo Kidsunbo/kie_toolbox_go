@@ -38,10 +38,26 @@ func ExecuteInSequence[T any](ctx context.Context, state T, plan *Plan, targets 
 	p.conditionalTargetNodes = make(map[string]struct{})
 	p.targetsSummary = nil
 	p.runningNodes = make(map[string]struct{})
-	p.currentNode = ""
 	p.chainNodes = targets
 
-	return executor.Execute(ctx, nodes, state, p)
+	currentNode := p.GetCurrentNode()
+	beforeExecuteFinishedNodes := make(map[string]*ExecuteResult, len(p.finishedNodes))
+	for k, v := range p.finishedNodes {
+		beforeExecuteFinishedNodes[k] = v
+	}
+
+	err := executor.Execute(ctx, nodes, state, p)
+	if err != nil {
+		// normally, this won't happen and only happens when the framework has bug. So just return error without modify ExecuteBy when error is reported.
+		return err
+	}
+
+	for k, node := range p.finishedNodes {
+		if _, exist := beforeExecuteFinishedNodes[k]; !exist {
+			node.ExecuteBy = currentNode
+		}
+	}
+	return nil
 }
 
 // ExecuteInParallel will run the targets in the same executor, state and plan, but in parallel.
@@ -60,13 +76,28 @@ func ExecuteInParallel[T any](ctx context.Context, state T, plan *Plan, targets 
 	p.conditionalTargetNodes = make(map[string]struct{})
 	p.targetsSummary = nil
 	p.runningNodes = make(map[string]struct{})
-	p.currentNode = ""
 	p.chainNodes = []string{targets[0]}
 	for _, target := range targets[1:] {
 		p.targetNodes[target] = struct{}{}
 	}
 
-	return executor.Execute(ctx, nodes, state, p)
+	currentNode := p.GetCurrentNode()
+	beforeExecuteFinishedNodes := make(map[string]*ExecuteResult, len(p.finishedNodes))
+	for k, v := range p.finishedNodes {
+		beforeExecuteFinishedNodes[k] = v
+	}
+	err := executor.Execute(ctx, nodes, state, p)
+	if err != nil {
+		// normally, this won't happen and only happens when the framework has bug. So just return error without modify ExecuteBy when error is reported.
+		return err
+	}
+
+	for k, node := range p.finishedNodes {
+		if _, exist := beforeExecuteFinishedNodes[k]; !exist {
+			node.ExecuteBy = currentNode
+		}
+	}
+	return nil
 }
 
 // RemoveResult will remove the result of the node and all the nodes that depend on it. User can use this function to re-run the node and its descendats.
