@@ -48,7 +48,6 @@ func ExecuteInSequence[T any](ctx context.Context, state T, plan *Plan, targets 
 
 	err := executor.Execute(ctx, nodes, state, p)
 	if err != nil {
-		// normally, this won't happen and only happens when the framework has bug. So just return error without modify ExecuteBy when error is reported.
 		return err
 	}
 
@@ -88,7 +87,6 @@ func ExecuteInParallel[T any](ctx context.Context, state T, plan *Plan, targets 
 	}
 	err := executor.Execute(ctx, nodes, state, p)
 	if err != nil {
-		// normally, this won't happen and only happens when the framework has bug. So just return error without modify ExecuteBy when error is reported.
 		return err
 	}
 
