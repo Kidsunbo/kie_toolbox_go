@@ -8,6 +8,8 @@ import (
 
 type Plan = kflow.Plan
 
+type ExecuteResult = kflow.ExecuteResult
+
 type Condition[T any] kflow.Condition[T]
 
 type IDependence[S any] interface {
