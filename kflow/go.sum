@@ -1,5 +1,7 @@
 github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250112135920-8e9c4376ed9d h1:o74mW+JDXiCHbzuLdzNScPy9dAsnD07C2KFAhuja2/4=
 github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250112135920-8e9c4376ed9d/go.mod h1:K3WXCBwfHxGaXnFQ5cenYzTor0TtwK2kY1NN2Ru6NNg=
+github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250401123507-17f2f0bb4ea4 h1:siLQEVu+9apHZzNC3qCF/Cg9mkjrgPVHTsBMzz6b7HU=
+github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250401123507-17f2f0bb4ea4/go.mod h1:K3WXCBwfHxGaXnFQ5cenYzTor0TtwK2kY1NN2Ru6NNg=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
