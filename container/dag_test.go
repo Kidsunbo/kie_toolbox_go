@@ -945,17 +945,17 @@ func TestCopy(t *testing.T) {
 	assert.Equal(t, "debug_copy", dagCp.name)
 	dagCp.SetName("new_debug")
 	assert.Equal(t, "new_debug", dagCp.GetName())
-	assert.NotSame(t, dag.vertices, dagCp.vertices)
+	assert.NotSame(t, &dag.vertices, &dagCp.vertices)
 	assert.Equal(t, 1, dag.vertices[1].value)
 
 	dagCp = dag.Copy(Copier[int](func(i int) int { return i + 1 }))
 	assert.Equal(t, "debug_copy", dagCp.GetName())
-	assert.NotSame(t, dag.vertices, dagCp.vertices)
+	assert.NotSame(t, &dag.vertices, &dagCp.vertices)
 	assert.Equal(t, 2, dagCp.vertices[1].value)
 
 	dagCp = dag.Copy(func(i int) int { return i + 1 })
 	assert.Equal(t, "debug_copy", dagCp.GetName())
-	assert.NotSame(t, dag.vertices, dagCp.vertices)
+	assert.NotSame(t, &dag.vertices, &dagCp.vertices)
 	assert.Equal(t, 1, dagCp.vertices[1].value)
 }
 

@@ -18,7 +18,7 @@ func TestNewVector(t *testing.T) {
 	assert.Equal(t, reflect.TypeOf(vs.data).Kind(), reflect.Slice)
 	assert.Equal(t, reflect.TypeOf(vs.data).Elem().Kind(), reflect.String)
 
-	assert.NotSame(t, vi.data, vs.data)
+	assert.NotSame(t, &vi.data, &vs.data)
 }
 
 func TestNewVectorWithSize(t *testing.T) {
@@ -34,7 +34,7 @@ func TestNewVectorWithSize(t *testing.T) {
 	assert.Equal(t, reflect.TypeOf(vs.data).Kind(), reflect.Slice)
 	assert.Equal(t, reflect.TypeOf(vs.data).Elem().Kind(), reflect.String)
 
-	assert.NotSame(t, vi.data, vs.data)
+	assert.NotSame(t, &vi.data, &vs.data)
 }
 
 func TestNewVectorWithCapacity(t *testing.T) {
@@ -50,7 +50,7 @@ func TestNewVectorWithCapacity(t *testing.T) {
 	assert.Equal(t, reflect.TypeOf(vs.data).Kind(), reflect.Slice)
 	assert.Equal(t, reflect.TypeOf(vs.data).Elem().Kind(), reflect.String)
 
-	assert.NotSame(t, vi.data, vs.data)
+	assert.NotSame(t, &vi.data, &vs.data)
 }
 
 func TestNewVectorWithDefaultValue(t *testing.T) {
@@ -72,7 +72,7 @@ func TestNewVectorWithDefaultValue(t *testing.T) {
 	assert.Equal(t, reflect.TypeOf(vs.data).Kind(), reflect.Slice)
 	assert.Equal(t, reflect.TypeOf(vs.data).Elem().Kind(), reflect.String)
 
-	assert.NotSame(t, vi.data, vs.data)
+	assert.NotSame(t, &vi.data, &vs.data)
 }
 
 func TestNewVectorFromSlice(t *testing.T) {
@@ -88,7 +88,7 @@ func TestNewVectorFromSlice(t *testing.T) {
 	assert.Equal(t, reflect.TypeOf(vi.data).Kind(), reflect.Slice)
 	assert.Equal(t, reflect.TypeOf(vi.data).Elem().Kind(), reflect.Int)
 
-	assert.NotSame(t, vi.data, data)
+	assert.NotSame(t, &vi.data, &data)
 }
 
 func TestNewVectorWithOtherVector(t *testing.T) {
@@ -99,7 +99,7 @@ func TestNewVectorWithOtherVector(t *testing.T) {
 	assert.Equal(t, len(v1.data), len(v2.data))
 	assert.Equal(t, 100, cap(v1.data))
 	assert.Equal(t, 7, cap(v2.data))
-	assert.NotSame(t, v1.data, v2.data)
+	assert.NotSame(t, &v1.data, &v2.data)
 }
 
 func TestVectorRead(t *testing.T) {

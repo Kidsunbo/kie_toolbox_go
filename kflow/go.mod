@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250401123507-17f2f0bb4ea4
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
