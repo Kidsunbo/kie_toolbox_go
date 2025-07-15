@@ -4,6 +4,8 @@ github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20250401123507-17f2f0bb4ea4 h1:b
 github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20250401123507-17f2f0bb4ea4/go.mod h1:6eG5IAfbc1YEhwL2DZp7OWkFUXUFtp2ryCiTYZ+dKII=
 github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20250421070845-b62f08faae4d h1:0HkqJ9OGh/V5Ney6Uijtvl5kZz1Qrc+Jb3YDB5I0ppE=
 github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20250421070845-b62f08faae4d/go.mod h1:mxYNCOMN5nC6lkiFs8MRvfh38T82tQLXI5WU8jsbGrs=
+github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20250715104913-81e7f7576b96 h1:RiCxpLIhhQ9OSl3UTYlBAQhbKOFxKljgLZPq750Zi6U=
+github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20250715104913-81e7f7576b96/go.mod h1:mxYNCOMN5nC6lkiFs8MRvfh38T82tQLXI5WU8jsbGrs=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
