@@ -736,13 +736,13 @@ func TestNormalNodeGraph8(t *testing.T) {
 	now := time.Now()
 	assert.Greater(t, now.Sub(plan.GetStartTime()).Seconds(), 0.9)
 	assert.Less(t, now.Sub(plan.GetStartTime()).Seconds(), 1.5)
-	type12Count := 0
+	count := map[string]int{}
 	for _, item := range state.Stamps {
-		if item == "Type1_2" {
-			type12Count++
-		}
+		count[item]++
 	}
-	assert.Equal(t, 1, type12Count)
+	for key, value := range count {
+		assert.Equal(t, 1, value, "节点[%s]执行了多次", key)
+	}
 }
 
 func TestStop(t *testing.T) {
