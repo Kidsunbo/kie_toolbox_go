@@ -713,6 +713,38 @@ func TestNormalNodeGraph7(t *testing.T) {
 	assert.True(t, plan.finishedNodes["Type1_2_by_Type1_1"].Skipped)
 }
 
+func TestNormalNodeGraph8(t *testing.T) {
+	node := new(Node[*State])
+	var plan *Plan
+	eng := NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1", nil).WithParallel("Type1_2", "Type1_1", "Type1_3", "Type1_4")))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_1", nil, 1)))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_2", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_3", []*Dependence[*State]{
+		node.ConditionalDependence("Type1_2", func(ctx context.Context, s *State) bool { return false }, nil),
+	}, 1)))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_4", []*Dependence[*State]{
+		node.StaticDependence("Type1_2"),
+	}, 1)))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+
+	assert.NoError(t, eng.Prepare())
+	// fmt.Println(eng.Dot())
+
+	state := new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Operator1", "PlanExtractor"))
+	now := time.Now()
+	assert.Greater(t, now.Sub(plan.GetStartTime()).Seconds(), 0.9)
+	assert.Less(t, now.Sub(plan.GetStartTime()).Seconds(), 1.5)
+	type12Count := 0
+	for _, item := range state.Stamps {
+		if item == "Type1_2" {
+			type12Count++
+		}
+	}
+	assert.Equal(t, 1, type12Count)
+}
+
 func TestStop(t *testing.T) {
 	node := new(Node[*State])
 
