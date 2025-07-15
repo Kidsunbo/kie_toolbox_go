@@ -72,7 +72,7 @@ func (n *nodeExecutor[T]) saveResult(result *ExecuteResult, plan *Plan) {
 	if result.BoxName == result.OriginalName {
 		plan.finishedOriginalNodes[result.OriginalName] = struct{}{}
 	}
-	delete(plan.runningNodes, result.OriginalName)
+	delete(plan.runningNodes, result.BoxName)
 	if !result.Success {
 		plan.failedNodes[result.BoxName] = struct{}{}
 	}
