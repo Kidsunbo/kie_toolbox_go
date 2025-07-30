@@ -20,15 +20,15 @@ func (n *nodeWrapper[S, D, T]) Name() string {
 
 func (n *nodeWrapper[S, D, T]) Dependence() []*kflow.Dependence[S] {
 	description := n.node.Description()
-	dependences := make([]*kflow.Dependence[S], 0, len(description.GetDependences()))
-	for _, dependence := range description.GetDependences() {
+	dependencies := make([]*kflow.Dependence[S], 0, len(description.GetDependencies()))
+	for _, dependence := range description.GetDependencies() {
 		if dependence.GetCondition() == nil {
-			dependences = append(dependences, n.StaticDependence(dependence.GetName()))
+			dependencies = append(dependencies, n.StaticDependence(dependence.GetName()))
 		} else {
-			dependences = append(dependences, n.ConditionalDependence(dependence.GetName(), kflow.Condition[S](dependence.GetCondition()), dependence.GetDependences()))
+			dependencies = append(dependencies, n.ConditionalDependence(dependence.GetName(), kflow.Condition[S](dependence.GetCondition()), dependence.GetDependencies()))
 		}
 	}
-	return dependences
+	return dependencies
 }
 
 func (n *nodeWrapper[S, D, T]) Run(ctx context.Context, state S, plan *Plan) error {
