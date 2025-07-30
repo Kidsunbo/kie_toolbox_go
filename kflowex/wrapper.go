@@ -18,14 +18,14 @@ func (n *nodeWrapper[S, D, T]) Name() string {
 	return n.node.Description().GetName()
 }
 
-func (n *nodeWrapper[S, D, T]) Dependence() []*kflow.Dependence[S] {
+func (n *nodeWrapper[S, D, T]) Dependencies() []*kflow.Dependency[S] {
 	description := n.node.Description()
-	dependencies := make([]*kflow.Dependence[S], 0, len(description.GetDependencies()))
-	for _, dependence := range description.GetDependencies() {
-		if dependence.GetCondition() == nil {
-			dependencies = append(dependencies, n.StaticDependence(dependence.GetName()))
+	dependencies := make([]*kflow.Dependency[S], 0, len(description.GetDependencies()))
+	for _, dependency := range description.GetDependencies() {
+		if dependency.GetCondition() == nil {
+			dependencies = append(dependencies, n.StaticDependency(dependency.GetName()))
 		} else {
-			dependencies = append(dependencies, n.ConditionalDependence(dependence.GetName(), kflow.Condition[S](dependence.GetCondition()), dependence.GetDependencies()))
+			dependencies = append(dependencies, n.ConditionalDependency(dependency.GetName(), kflow.Condition[S](dependency.GetCondition()), dependency.GetDependencies()))
 		}
 	}
 	return dependencies

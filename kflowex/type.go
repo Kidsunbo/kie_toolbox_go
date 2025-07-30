@@ -12,7 +12,7 @@ type ExecuteResult = kflow.ExecuteResult
 
 type Condition[T any] kflow.Condition[T]
 
-type IDependence[S any] interface {
+type IDependency[S any] interface {
 	GetName() string
 	GetCondition() Condition[S]
 	GetDependencies() []string
@@ -20,7 +20,7 @@ type IDependence[S any] interface {
 
 type IDescription[S any] interface {
 	GetName() string
-	GetDependencies() []IDependence[S]
+	GetDependencies() []IDependency[S]
 }
 
 type INode[S any, D IDescription[S]] interface {
