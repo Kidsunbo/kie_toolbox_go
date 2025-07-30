@@ -3,7 +3,7 @@ module github.com/Kidsunbo/kie_toolbox_go/kflowex
 go 1.21
 
 require (
-	github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20250730061556-330b5d6c8b93
+	github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20250730035714-06274030c8f1
 	github.com/stretchr/testify v1.10.0
 )
 
