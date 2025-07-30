@@ -49,26 +49,26 @@ func (b FlowNode) Run(ctx context.Context, state *State, plan *Plan) error {
 	return nil
 }
 
-type StringDependence struct {
-	dependence []string
+type StringDependency struct {
+	dependencies []string
 }
 
-func (m StringDependence) Dependence() []string {
-	return m.dependence
+func (m StringDependency) Dependencies() []string {
+	return m.dependencies
 }
 
-type ConditionDependence struct {
-	dependence []*Dependence[*State]
+type ConditionDependency struct {
+	dependencies []*Dependency[*State]
 }
 
-func (m ConditionDependence) Dependence() []*Dependence[*State] {
-	return m.dependence
+func (m ConditionDependency) Dependencies() []*Dependency[*State] {
+	return m.dependencies
 }
 
-// NodeType1 is a basic node with string dependence.
+// NodeType1 is a basic node with string dependency.
 type NodeType1 struct {
 	BasicNode
-	StringDependence
+	StringDependency
 }
 
 func NewNodeType1(name string, dep []string) *NodeType1 {
@@ -76,33 +76,33 @@ func NewNodeType1(name string, dep []string) *NodeType1 {
 		BasicNode: BasicNode{
 			name: name,
 		},
-		StringDependence: StringDependence{
-			dependence: dep,
+		StringDependency: StringDependency{
+			dependencies: dep,
 		},
 	}
 }
 
-// NodeType2 is a basic node with condition dependence.
+// NodeType2 is a basic node with condition dependency.
 type NodeType2 struct {
 	BasicNode
-	ConditionDependence
+	ConditionDependency
 }
 
-func NewNodeType2(name string, dep []*Dependence[*State]) *NodeType2 {
+func NewNodeType2(name string, dep []*Dependency[*State]) *NodeType2 {
 	return &NodeType2{
 		BasicNode: BasicNode{
 			name: name,
 		},
-		ConditionDependence: ConditionDependence{
-			dependence: dep,
+		ConditionDependency: ConditionDependency{
+			dependencies: dep,
 		},
 	}
 }
 
-// NodeType3 is a flow node with string dependence.
+// NodeType3 is a flow node with string dependency.
 type NodeType3 struct {
 	FlowNode
-	StringDependence
+	StringDependency
 }
 
 func NewNodeType3(name string, dep []string) *NodeType3 {
@@ -110,25 +110,25 @@ func NewNodeType3(name string, dep []string) *NodeType3 {
 		FlowNode: FlowNode{
 			name: name,
 		},
-		StringDependence: StringDependence{
-			dependence: dep,
+		StringDependency: StringDependency{
+			dependencies: dep,
 		},
 	}
 }
 
-// NodeType4 is a flow node with condition dependence.
+// NodeType4 is a flow node with condition dependency.
 type NodeType4 struct {
 	FlowNode
-	ConditionDependence
+	ConditionDependency
 }
 
-func NewNodeType4(name string, dep []*Dependence[*State]) *NodeType4 {
+func NewNodeType4(name string, dep []*Dependency[*State]) *NodeType4 {
 	return &NodeType4{
 		FlowNode: FlowNode{
 			name: name,
 		},
-		ConditionDependence: ConditionDependence{
-			dependence: dep,
+		ConditionDependency: ConditionDependency{
+			dependencies: dep,
 		},
 	}
 }
@@ -136,7 +136,7 @@ func NewNodeType4(name string, dep []*Dependence[*State]) *NodeType4 {
 // NodeTimeCostType is a flow node with timeout.
 type NodeTimeCostType struct {
 	FlowNode
-	ConditionDependence
+	ConditionDependency
 	timecost time.Duration
 }
 
@@ -149,13 +149,13 @@ func (n *NodeTimeCostType) Run(ctx context.Context, state *State, plan *Plan) er
 	return nil
 }
 
-func NewNodeTimeCostType(name string, dep []*Dependence[*State], timeout int64) *NodeTimeCostType {
+func NewNodeTimeCostType(name string, dep []*Dependency[*State], timeout int64) *NodeTimeCostType {
 	return &NodeTimeCostType{
 		FlowNode: FlowNode{
 			name: name,
 		},
-		ConditionDependence: ConditionDependence{
-			dependence: dep,
+		ConditionDependency: ConditionDependency{
+			dependencies: dep,
 		},
 		timecost: time.Duration(timeout),
 	}
@@ -164,7 +164,7 @@ func NewNodeTimeCostType(name string, dep []*Dependence[*State], timeout int64) 
 // NodeErrorType is a basic node with error.
 type NodeErrorType struct {
 	BasicNode
-	StringDependence
+	StringDependency
 }
 
 func (*NodeErrorType) Run(ctx context.Context, state *State) error {
@@ -176,8 +176,8 @@ func NewNodeErrorType(name string, dep []string) *NodeErrorType {
 		BasicNode: BasicNode{
 			name: name,
 		},
-		StringDependence: StringDependence{
-			dependence: dep,
+		StringDependency: StringDependency{
+			dependencies: dep,
 		},
 	}
 }
@@ -185,7 +185,7 @@ func NewNodeErrorType(name string, dep []string) *NodeErrorType {
 // NodePanicType is a basic node with panic.
 type NodePanicType struct {
 	BasicNode
-	StringDependence
+	StringDependency
 }
 
 func (*NodePanicType) Run(ctx context.Context, state *State) error {
@@ -197,8 +197,8 @@ func NewNodePanicType(name string, dep []string) *NodePanicType {
 		BasicNode: BasicNode{
 			name: name,
 		},
-		StringDependence: StringDependence{
-			dependence: dep,
+		StringDependency: StringDependency{
+			dependencies: dep,
 		},
 	}
 }
@@ -206,7 +206,7 @@ func NewNodePanicType(name string, dep []string) *NodePanicType {
 // NodeStopType is a flow node to stop the plan.
 type NodeStopType struct {
 	FlowNode
-	StringDependence
+	StringDependency
 }
 
 func (n *NodeStopType) Run(ctx context.Context, state *State, plan *Plan) error {
@@ -223,8 +223,8 @@ func NewNodeStopType(name string, dep []string) *NodeStopType {
 		FlowNode: FlowNode{
 			name: name,
 		},
-		StringDependence: StringDependence{
-			dependence: dep,
+		StringDependency: StringDependency{
+			dependencies: dep,
 		},
 	}
 }
@@ -233,7 +233,7 @@ func NewNodeStopType(name string, dep []string) *NodeStopType {
 type NodePlanExtractor struct {
 	plan **Plan
 	FlowNode
-	StringDependence
+	StringDependency
 }
 
 func (n *NodePlanExtractor) Run(ctx context.Context, state *State, plan *Plan) error {
@@ -251,8 +251,8 @@ func NewNodePlanExtractor(name string, dep []string, plan **Plan) *NodePlanExtra
 		FlowNode: FlowNode{
 			name: name,
 		},
-		StringDependence: StringDependence{
-			dependence: dep,
+		StringDependency: StringDependency{
+			dependencies: dep,
 		},
 		plan: plan,
 	}
@@ -261,7 +261,7 @@ func NewNodePlanExtractor(name string, dep []string, plan **Plan) *NodePlanExtra
 // NodeAddNodeType is a flow node to add target nodes.
 type NodeAddNodeType struct {
 	FlowNode
-	StringDependence
+	StringDependency
 	nodes []string
 }
 
@@ -278,8 +278,8 @@ func NewNodeAddNodeType(name string, dep []string, nodes []string) *NodeAddNodeT
 		FlowNode: FlowNode{
 			name: name,
 		},
-		StringDependence: StringDependence{
-			dependence: dep,
+		StringDependency: StringDependency{
+			dependencies: dep,
 		},
 		nodes: nodes,
 	}
@@ -288,7 +288,7 @@ func NewNodeAddNodeType(name string, dep []string, nodes []string) *NodeAddNodeT
 // NodePlanOperatorType is a flow node to operate the plan.
 type NodePlanOperatorType struct {
 	FlowNode
-	StringDependence
+	StringDependency
 	t *testing.T
 }
 
@@ -316,8 +316,8 @@ func NewNodePlanOperatorType(name string, dep []string) *NodePlanOperatorType {
 		FlowNode: FlowNode{
 			name: name,
 		},
-		StringDependence: StringDependence{
-			dependence: dep,
+		StringDependency: StringDependency{
+			dependencies: dep,
 		},
 	}
 }
@@ -325,7 +325,7 @@ func NewNodePlanOperatorType(name string, dep []string) *NodePlanOperatorType {
 // NodeExecuteInRunTimeType is a flow node to execute in run time. It will run first batch in sequence and second batch in parallel.
 type NodeExecuteInRunTimeType struct {
 	FlowNode
-	StringDependence
+	StringDependency
 	batches  [][]string
 	parallel []bool
 }
@@ -372,15 +372,15 @@ func NewNodeExecuteInRunType(name string, dep []string) *NodeExecuteInRunTimeTyp
 		FlowNode: FlowNode{
 			name: name,
 		},
-		StringDependence: StringDependence{
-			dependence: dep,
+		StringDependency: StringDependency{
+			dependencies: dep,
 		},
 	}
 }
 
 type NodeResultResultType[T any] struct {
 	FlowNode
-	StringDependence
+	StringDependency
 	removes []string
 }
 
@@ -403,8 +403,8 @@ func NewNodeResultResultType[T any](name string, dep []string, removes []string)
 		FlowNode: FlowNode{
 			name: name,
 		},
-		StringDependence: StringDependence{
-			dependence: dep,
+		StringDependency: StringDependency{
+			dependencies: dep,
 		},
 		removes: removes,
 	}
@@ -421,11 +421,11 @@ func TestNormalNodeGraph1(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_3", []string{"Type1_1"})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_1"})))
 
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependence[*State]{
-		node.StaticDependence("Type1_3"), node.ConditionalDependence("Type1_1", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_2"}),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependency[*State]{
+		node.StaticDependency("Type1_3"), node.ConditionalDependency("Type1_1", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_2"}),
 	})))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_2", []*Dependence[*State]{
-		node.StaticDependence("Type1_2"), node.ConditionalDependence("Type2_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_2", "Type1_4"}),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_2", []*Dependency[*State]{
+		node.StaticDependency("Type1_2"), node.ConditionalDependency("Type2_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_2", "Type1_4"}),
 	})))
 
 	assert.NoError(t, eng.Prepare())
@@ -464,12 +464,12 @@ func TestNormalNodeGraph2(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", []string{"Type1_6"})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", nil)))
 
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependence[*State]{
-		node.StaticDependence("Type1_3"),
-		node.ConditionalDependence("Type1_5", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_2"}),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependency[*State]{
+		node.StaticDependency("Type1_3"),
+		node.ConditionalDependency("Type1_5", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_2"}),
 	})))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_2", []*Dependence[*State]{
-		node.ConditionalDependence("Type2_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_2", "Type1_4"}),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_2", []*Dependency[*State]{
+		node.ConditionalDependency("Type2_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_2", "Type1_4"}),
 	})))
 
 	assert.NoError(t, eng.Prepare())
@@ -507,12 +507,12 @@ func TestNormalNodeGraph3(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", []string{"Type1_6"})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", nil)))
 
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependence[*State]{
-		node.StaticDependence("Type1_3"),
-		node.ConditionalDependence("Type1_5", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_2"}),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependency[*State]{
+		node.StaticDependency("Type1_3"),
+		node.ConditionalDependency("Type1_5", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_2"}),
 	})))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_2", []*Dependence[*State]{
-		node.ConditionalDependence("Type2_1", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_2", "Type1_4"}),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_2", []*Dependency[*State]{
+		node.ConditionalDependency("Type2_1", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_2", "Type1_4"}),
 	})))
 
 	assert.NoError(t, eng.Prepare())
@@ -548,12 +548,12 @@ func TestNormalNodeGraph4(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", []string{"Type1_6"})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", nil)))
 
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependence[*State]{
-		node.StaticDependence("Type1_3"),
-		node.ConditionalDependence("Type1_5", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_2"}),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependency[*State]{
+		node.StaticDependency("Type1_3"),
+		node.ConditionalDependency("Type1_5", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_2"}),
 	})))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_2", []*Dependence[*State]{
-		node.ConditionalDependence("Type2_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_2", "Type1_4"}),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_2", []*Dependency[*State]{
+		node.ConditionalDependency("Type2_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_2", "Type1_4"}),
 	})))
 
 	assert.NoError(t, eng.Prepare())
@@ -596,12 +596,12 @@ func TestNormalNodeGraph5(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", []string{"Type1_6"})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", nil)))
 	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependence[*State]{
-		node.StaticDependence("Type1_3"),
-		node.ConditionalDependence("Type1_5", func(ctx context.Context, s *State) bool { panic("") }, []string{"Type1_2"}),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_1", []*Dependency[*State]{
+		node.StaticDependency("Type1_3"),
+		node.ConditionalDependency("Type1_5", func(ctx context.Context, s *State) bool { panic("") }, []string{"Type1_2"}),
 	})))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_2", []*Dependence[*State]{
-		node.ConditionalDependence("Type2_1", func(ctx context.Context, s *State) bool { panic("") }, []string{"Type1_2", "Type1_4"}),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type2_2", []*Dependency[*State]{
+		node.ConditionalDependency("Type2_1", func(ctx context.Context, s *State) bool { panic("") }, []string{"Type1_2", "Type1_4"}),
 	})))
 
 	assert.NoError(t, eng.Prepare())
@@ -693,8 +693,8 @@ func TestNormalNodeGraph7(t *testing.T) {
 	eng := NewEngine[*State]("")
 	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_2", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_3", nil)))
-	assert.NoError(t, AddNode(eng, NewNodeType2("Type1_1", []*Dependence[*State]{
-		node.ConditionalDependence("Type1_2", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_3"}),
+	assert.NoError(t, AddNode(eng, NewNodeType2("Type1_1", []*Dependency[*State]{
+		node.ConditionalDependency("Type1_2", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_3"}),
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_2"})))
 	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
@@ -720,11 +720,11 @@ func TestNormalNodeGraph8(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeExecuteInRunType("Operator1", nil).WithParallel("Type1_2", "Type1_1", "Type1_3", "Type1_4")))
 	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_1", nil, 1)))
 	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_2", nil)))
-	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_3", []*Dependence[*State]{
-		node.ConditionalDependence("Type1_2", func(ctx context.Context, s *State) bool { return false }, nil),
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_3", []*Dependency[*State]{
+		node.ConditionalDependency("Type1_2", func(ctx context.Context, s *State) bool { return false }, nil),
 	}, 1)))
-	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_4", []*Dependence[*State]{
-		node.StaticDependence("Type1_2"),
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("Type1_4", []*Dependency[*State]{
+		node.StaticDependency("Type1_2"),
 	}, 1)))
 	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
 
@@ -752,8 +752,8 @@ func TestStop(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_0", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeStopType("Type1_2", []string{"Type1_1"})))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_3", []*Dependence[*State]{nil})))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_4", []*Dependence[*State]{node.StaticDependence("Type1_3")})))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_3", []*Dependency[*State]{nil})))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_4", []*Dependency[*State]{node.StaticDependency("Type1_3")})))
 
 	assert.NoError(t, eng.Prepare())
 
@@ -782,10 +782,10 @@ func TestLanguage(t *testing.T) {
 
 	eng = NewEngine[*State]("")
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", nil)))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_2", []*Dependence[*State]{
-		node.StaticDependence("xxx"),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_2", []*Dependency[*State]{
+		node.StaticDependency("xxx"),
 	})))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_3", []*Dependence[*State]{nil})))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_3", []*Dependency[*State]{nil})))
 
 	assert.EqualError(t, eng.Prepare(), "节点[xxx]不存在")
 }
@@ -799,11 +799,11 @@ func TestCycle(t *testing.T) {
 	assert.True(t, strings.HasPrefix(eng.Prepare().Error(), "检测到环存在"))
 
 	eng = NewEngine[*State]("", ReportInChinese)
-	assert.NoError(t, AddNode(eng, NewNodeType2("Type1_1", []*Dependence[*State]{
-		node.ConditionalDependence("Type1_2", func(ctx context.Context, s *State) bool { return false }, nil),
+	assert.NoError(t, AddNode(eng, NewNodeType2("Type1_1", []*Dependency[*State]{
+		node.ConditionalDependency("Type1_2", func(ctx context.Context, s *State) bool { return false }, nil),
 	})))
-	assert.NoError(t, AddNode(eng, NewNodeType2("Type1_2", []*Dependence[*State]{
-		node.ConditionalDependence("Type1_1", func(ctx context.Context, s *State) bool { return false }, nil),
+	assert.NoError(t, AddNode(eng, NewNodeType2("Type1_2", []*Dependency[*State]{
+		node.ConditionalDependency("Type1_1", func(ctx context.Context, s *State) bool { return false }, nil),
 	})))
 	assert.Error(t, eng.Prepare())
 	assert.True(t, strings.HasPrefix(eng.Prepare().Error(), "检测到环存在"))
@@ -820,8 +820,8 @@ func TestTimeoutAndError(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_1", []string{
 		"TypeTimeout_1", "TypeTimeout_2",
 	})))
-	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("TypeTimeout_1", []*Dependence[*State]{}, 2)))
-	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("TypeTimeout_2", []*Dependence[*State]{}, 3)))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("TypeTimeout_1", []*Dependency[*State]{}, 2)))
+	assert.NoError(t, AddNode(eng, NewNodeTimeCostType("TypeTimeout_2", []*Dependency[*State]{}, 3)))
 	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
 	assert.NoError(t, eng.Prepare())
 	assert.EqualError(t, eng.Run(context.Background(), state, "PlanExtractor", "Type1_1"), "节点运行超时")
@@ -831,8 +831,8 @@ func TestTimeoutAndError(t *testing.T) {
 
 	plan = nil
 	eng = NewEngine[*State]("")
-	assert.NoError(t, AddNode(eng, NewNodeType2("Type2_1", []*Dependence[*State]{
-		node.StaticDependence("TypeError_1"), node.StaticDependence("TypePanic_1"),
+	assert.NoError(t, AddNode(eng, NewNodeType2("Type2_1", []*Dependency[*State]{
+		node.StaticDependency("TypeError_1"), node.StaticDependency("TypePanic_1"),
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeErrorType("TypeError_1", nil)))
 	assert.NoError(t, AddNode(eng, NewNodePanicType("TypePanic_1", nil)))
@@ -879,9 +879,9 @@ func TestAddNodesDynamically(t *testing.T) {
 	}, []string{"Type1_2", "Type1_8"})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_1", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_2", []string{"Type1_3"})))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_3", []*Dependence[*State]{
-		node.ConditionalDependence("Type1_4", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_5"}),
-		node.ConditionalDependence("Type1_6", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_7"}),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_3", []*Dependency[*State]{
+		node.ConditionalDependency("Type1_4", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_5"}),
+		node.ConditionalDependency("Type1_6", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_7"}),
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_4", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_5", nil)))
@@ -1201,8 +1201,8 @@ func TestRemoveResult(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_6", []string{
 		"RemoveResult_1", "RemoveResult_2",
 	})))
-	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_7", []*Dependence[*State]{
-		node.ConditionalDependence("Type1_8", func(ctx context.Context, s *State) bool { return true }, nil),
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type1_7", []*Dependency[*State]{
+		node.ConditionalDependency("Type1_8", func(ctx context.Context, s *State) bool { return true }, nil),
 	})))
 	assert.NoError(t, AddNode(eng, NewNodeType3("Type1_8", nil)))
 	assert.NoError(t, AddNode(eng, NewNodePanicType("Type1_9", nil)))
@@ -1419,11 +1419,11 @@ func BenchmarkNormalNodeGraph1(b *testing.B) {
 	AddNode(eng, NewNodeType3("Type1_3", []string{"Type1_1"}))
 	AddNode(eng, NewNodeType3("Type1_4", []string{"Type1_1"}))
 
-	AddNode(eng, NewNodeType4("Type2_1", []*Dependence[*State]{
-		node.StaticDependence("Type1_3"), node.ConditionalDependence("Type1_1", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_2"}),
+	AddNode(eng, NewNodeType4("Type2_1", []*Dependency[*State]{
+		node.StaticDependency("Type1_3"), node.ConditionalDependency("Type1_1", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_2"}),
 	}))
-	AddNode(eng, NewNodeType4("Type2_2", []*Dependence[*State]{
-		node.StaticDependence("Type1_2"), node.ConditionalDependence("Type2_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_2", "Type1_4"}),
+	AddNode(eng, NewNodeType4("Type2_2", []*Dependency[*State]{
+		node.StaticDependency("Type1_2"), node.ConditionalDependency("Type2_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_2", "Type1_4"}),
 	}))
 
 	eng.Prepare()

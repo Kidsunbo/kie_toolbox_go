@@ -224,12 +224,12 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 		return false, nil, nil
 	}
 
-	// check if it has failed dependence
-	hasFailedDependence, failedNode, err := n.hasFailedDependence(nodes, node, plan)
+	// check if it has failed dependency
+	hasFailedDependency, failedNode, err := n.hasFailedDependency(nodes, node, plan)
 	if err != nil {
 		return false, nil, err
 	}
-	if hasFailedDependence {
+	if hasFailedDependency {
 		result := &ExecuteResult{
 			BoxName:       node.BoxName,
 			OriginalName:  originalName,
@@ -240,7 +240,7 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 			ExecuteBy:     plan.currentNode,
 			Success:       false,
 			Skipped:       true,
-			SkippedReason: fmt.Sprintf(message(plan.config.Language, nodeHasFailedDependence), node.BoxName, failedNode),
+			SkippedReason: fmt.Sprintf(message(plan.config.Language, nodeHasFailedDependency), node.BoxName, failedNode),
 			EndTime:       time.Now(),
 		}
 		return false, result, nil
@@ -293,7 +293,7 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 	return true, nil, nil
 }
 
-func (n *nodeExecutor[T]) hasFailedDependence(nodes *container.Dag[string, *nodeBox[T]], node *nodeBox[T], plan *Plan) (bool, string, error) {
+func (n *nodeExecutor[T]) hasFailedDependency(nodes *container.Dag[string, *nodeBox[T]], node *nodeBox[T], plan *Plan) (bool, string, error) {
 	for key := range plan.failedNodes {
 		canReach, err := nodes.CanReach(node.BoxName, key)
 		if err != nil {

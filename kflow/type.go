@@ -9,17 +9,17 @@ import (
 	"github.com/Kidsunbo/kie_toolbox_go/container"
 )
 
-// INode specifies the must-have requirement for basic node and flow node. It must have a name and dependence.
+// INode specifies the must-have requirement for basic node and flow node. It must have a name and dependency.
 type INode interface {
 	Name() string
 }
 
-type dependenceReturnType[T any] interface {
-	string | *Dependence[T]
+type dependencyReturnType[T any] interface {
+	string | *Dependency[T]
 }
 
-type IDependency[T any, R dependenceReturnType[T]] interface {
-	Dependence() []R
+type IDependency[T any, R dependencyReturnType[T]] interface {
+	Dependencies() []R
 }
 
 // IBasicNode specifies the interface for basic node.
@@ -45,10 +45,10 @@ type IExecutor[T any] interface {
 	Execute(context.Context, *container.Dag[string, *nodeBox[T]], T, *Plan) error
 }
 
-type Dependence[T any] struct {
-	DependenceName      string
-	Condition           Condition[T]
-	ConditionDependence []string
+type Dependency[T any] struct {
+	DependencyName        string
+	Condition             Condition[T]
+	ConditionDependencies []string
 }
 
 type ExecuteResult struct {

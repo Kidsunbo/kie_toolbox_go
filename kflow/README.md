@@ -40,17 +40,17 @@ type Node struct {
 
 func (*Node) Name() string {return "node"}
 
-func (*Node) Dependence() []string {
+func (*Node) Dependencies() []string {
     return []string{"other_node"}
 } 
 
-func (*Node) Dependence() []*Dependence[State] {
-    return []*Dependence{
-        node.StaticDependence("other_node"),
-        node.ConditionalDependence(
+func (*Node) Dependencies() []*Dependency[State] {
+    return []*Dependency{
+        node.StaticDependency("other_node"),
+        node.ConditionalDependency(
             "other_node", 
             /* the condition check function */ func(ctx context.Context, state State)bool{return true}, 
-            []string{"conditional_dependence"},
+            []string{"conditional_dependency"},
         ),
     }
 }
@@ -64,4 +64,4 @@ func (*Node) Run(ctx context.Context, state State, plan *Plan) error {
 }
 ```
 
-As shown, a valid node must have a `Name` function. There are two kinds of `Dependence` method and feel free to choose one you need. You can also ignore `Dependence` if the node doesn't have any dependence. There are also two kinds of `Run` method as shown in the example, while the former is for `BasicNode` and the latter is for `FlowNode`.
+As shown, a valid node must have a `Name` function. There are two kinds of `Dependencies` method and feel free to choose one you need. You can also ignore `Dependencies` if the node doesn't have any dependency. There are also two kinds of `Run` method as shown in the example, while the former is for `BasicNode` and the latter is for `FlowNode`.
