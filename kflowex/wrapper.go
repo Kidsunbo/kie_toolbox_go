@@ -20,12 +20,12 @@ func (n *nodeWrapper[S, D, T]) Name() string {
 
 func (n *nodeWrapper[S, D, T]) Dependence() []*kflow.Dependence[S] {
 	description := n.node.Description()
-	dependencies := make([]*kflow.Dependence[S], 0, len(description.GetDependencies()))
-	for _, dependence := range description.GetDependencies() {
+	dependencies := make([]*kflow.Dependence[S], 0, len(description.GetDependence()))
+	for _, dependence := range description.GetDependence() {
 		if dependence.GetCondition() == nil {
 			dependencies = append(dependencies, n.StaticDependence(dependence.GetName()))
 		} else {
-			dependencies = append(dependencies, n.ConditionalDependence(dependence.GetName(), kflow.Condition[S](dependence.GetCondition()), dependence.GetDependencies()))
+			dependencies = append(dependencies, n.ConditionalDependence(dependence.GetName(), kflow.Condition[S](dependence.GetCondition()), dependence.GetDependence()))
 		}
 	}
 	return dependencies

@@ -15,12 +15,12 @@ type Condition[T any] kflow.Condition[T]
 type IDependence[S any] interface {
 	GetName() string
 	GetCondition() Condition[S]
-	GetDependencies() []string
+	GetDependence() []string
 }
 
 type IDescription[S any] interface {
 	GetName() string
-	GetDependencies() []IDependence[S]
+	GetDependence() []IDependence[S]
 }
 
 type INode[S any, D IDescription[S]] interface {
