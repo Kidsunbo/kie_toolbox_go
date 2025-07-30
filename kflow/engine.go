@@ -66,17 +66,17 @@ func (n *Engine[T]) Prepare() error {
 
 	originalEdge := make(map[string]string)
 	for _, node := range allNodes {
-		if depNode, ok := node.Node.(IDependency[T, *Dependence[T]]); ok {
-			for _, v := range depNode.Dependence() {
+		if depNode, ok := node.Node.(IDependency[T, *Dependency[T]]); ok {
+			for _, v := range depNode.Dependencies() {
 				if v == nil {
 					continue
 				}
-				underlineNode, exist := refNodes[v.DependenceName]
+				underlineNode, exist := refNodes[v.DependencyName]
 				if !exist {
-					return fmt.Errorf(message(n.config.Language, nodeNotExist), v.DependenceName)
+					return fmt.Errorf(message(n.config.Language, nodeNotExist), v.DependencyName)
 				}
 				if v.Condition == nil {
-					err := n.nodes.AddEdge(node.BoxName, v.DependenceName)
+					err := n.nodes.AddEdge(node.BoxName, v.DependencyName)
 					if err != nil {
 						return err
 					}
@@ -103,7 +103,7 @@ func (n *Engine[T]) Prepare() error {
 					if err != nil {
 						return err
 					}
-					for _, dep := range v.ConditionDependence {
+					for _, dep := range v.ConditionDependencies {
 						if !contains(refNodes, dep) {
 							return fmt.Errorf(message(n.config.Language, nodeNotExist), dep)
 						}
@@ -119,7 +119,7 @@ func (n *Engine[T]) Prepare() error {
 				}
 			}
 		} else if depNode, ok := node.Node.(IDependency[T, string]); ok {
-			for _, dep := range depNode.Dependence() {
+			for _, dep := range depNode.Dependencies() {
 				if !contains(refNodes, dep) {
 					return fmt.Errorf(message(n.config.Language, nodeNotExist), dep)
 				}
@@ -210,9 +210,9 @@ func (n *Engine[T]) Dot() string {
 	nodes := n.nodes.GetAllVertices()
 	edges := n.nodes.GetAllEdges()
 
-	const dependenceByCondition = 1
-	const conditionalDependence = 2
-	const normalDependence = 3
+	const dependencyByCondition = 1
+	const conditionalDependency = 2
+	const normalDependency = 3
 
 	deps := make(map[string]map[string]int, len(nodes))
 	for _, node := range nodes {
@@ -221,13 +221,13 @@ func (n *Engine[T]) Dot() string {
 	for _, node := range nodes {
 		if node.Condition == nil {
 			for _, edge := range edges[node.BoxName] {
-				deps[node.BoxName][edge] = normalDependence
+				deps[node.BoxName][edge] = normalDependency
 			}
 		} else {
 			for _, edge := range edges[node.BoxName] {
-				deps[node.BoxName][edge] = dependenceByCondition
+				deps[node.BoxName][edge] = dependencyByCondition
 			}
-			deps[node.BoxName][node.Node.Name()] = conditionalDependence
+			deps[node.BoxName][node.Node.Name()] = conditionalDependency
 		}
 	}
 
@@ -243,11 +243,11 @@ func (n *Engine[T]) Dot() string {
 	for from, dep := range deps {
 		for to, degree := range dep {
 			switch degree {
-			case normalDependence:
+			case normalDependency:
 				sb.WriteString(fmt.Sprintf("  %v -> %v;\n", from, to))
-			case conditionalDependence:
+			case conditionalDependency:
 				sb.WriteString(fmt.Sprintf("  %v -> %v [color=red];\n", from, to))
-			case dependenceByCondition:
+			case dependencyByCondition:
 				sb.WriteString(fmt.Sprintf("  %v -> %v [color=blue];\n", from, to))
 			}
 		}
