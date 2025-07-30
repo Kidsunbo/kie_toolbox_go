@@ -21,42 +21,42 @@ func (s *State) AddStep(step string) {
 	s.Step = append(s.Step, step)
 }
 
-type Dependence[S any] struct {
-	Name        string
-	Condition   kflowex.Condition[S]
+type Dependency[S any] struct {
+	Name         string
+	Condition    kflowex.Condition[S]
 	Dependencies []string
 }
 
-func (d Dependence[S]) GetName() string {
+func (d Dependency[S]) GetName() string {
 	return d.Name
 }
 
-func (d Dependence[S]) GetCondition() kflowex.Condition[S] {
+func (d Dependency[S]) GetCondition() kflowex.Condition[S] {
 	return d.Condition
 }
 
-func (d Dependence[S]) GetDependencies() []string {
+func (d Dependency[S]) GetDependencies() []string {
 	return d.Dependencies
 }
 
 type Description[S any] struct {
-	Name                  string
-	Dependence            []string
-	ConditionalDependence []Dependence[S]
+	Name                    string
+	Dependencies            []string
+	ConditionalDependencies []Dependency[S]
 }
 
 func (d Description[S]) GetName() string {
 	return d.Name
 }
 
-func (d Description[S]) GetDependencies() []kflowex.IDependence[S] {
-	deps := make([]kflowex.IDependence[S], 0, len(d.Dependence))
-	for _, dep := range d.Dependence {
-		deps = append(deps, Dependence[S]{
+func (d Description[S]) GetDependencies() []kflowex.IDependency[S] {
+	deps := make([]kflowex.IDependency[S], 0, len(d.Dependencies))
+	for _, dep := range d.Dependencies {
+		deps = append(deps, Dependency[S]{
 			Name: dep,
 		})
 	}
-	for _, dep := range d.ConditionalDependence {
+	for _, dep := range d.ConditionalDependencies {
 		deps = append(deps, dep)
 	}
 	return deps
@@ -104,8 +104,8 @@ func NewNode3() *Node3 {
 
 func (n *Node3) Description() Description[*State] {
 	return Description[*State]{
-		Name:       "Node3",
-		Dependence: []string{"Node1", "Node2"},
+		Name:         "Node3",
+		Dependencies: []string{"Node1", "Node2"},
 	}
 }
 
@@ -122,12 +122,12 @@ func NewNode4() *Node4 {
 
 func (n *Node4) Description() Description[*State] {
 	return Description[*State]{
-		Name:       "Node4",
-		Dependence: []string{"Node1"},
-		ConditionalDependence: []Dependence[*State]{
+		Name:         "Node4",
+		Dependencies: []string{"Node1"},
+		ConditionalDependencies: []Dependency[*State]{
 			{
-				Name:        "Node2",
-				Condition:   func(ctx context.Context, state *State) bool { return true },
+				Name:         "Node2",
+				Condition:    func(ctx context.Context, state *State) bool { return true },
 				Dependencies: []string{"Node3"},
 			},
 		},
@@ -147,9 +147,9 @@ func NewNode5() *Node5 {
 
 func (n *Node5) Description() Description[*State] {
 	return Description[*State]{
-		Name:       "Node5",
-		Dependence: []string{"Node1"},
-		ConditionalDependence: []Dependence[*State]{
+		Name:         "Node5",
+		Dependencies: []string{"Node1"},
+		ConditionalDependencies: []Dependency[*State]{
 			{
 				Name:      "Node2",
 				Condition: func(ctx context.Context, state *State) bool { return false },
