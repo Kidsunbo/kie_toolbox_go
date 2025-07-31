@@ -310,21 +310,22 @@ func (n *nodeExecutor[T]) asyncRunNode(ctx context.Context, batch []*nodeBox[T],
 	for _, node := range batch {
 		node := node
 		plan.runningNodes[node.Node.Name()] = struct{}{}
-		backupResult := &ExecuteResult{
-			BoxName:       node.BoxName,
-			OriginalName:  node.Node.Name(),
-			Node:          node.Node,
-			RunInParallel: plan.inParallel.Load(),
-			StartTime:     time.Now(),
-			ExecuteBy:     plan.currentNode,
-		}
+		startTime := time.Now()
 		go func() {
 			defer func() {
 				if a := recover(); a != nil {
-					backupResult.Success = false
-					backupResult.Err = fmt.Errorf("panic: %v", a)
-					backupResult.IsPanic = true
-					backupResult.EndTime = time.Now()
+					backupResult := &ExecuteResult{
+						BoxName:       node.BoxName,
+						OriginalName:  node.Node.Name(),
+						Node:          node.Node,
+						Success:       false,
+						Err:           fmt.Errorf("panic: %v", a),
+						IsPanic:       true,
+						RunInParallel: plan.inParallel.Load(),
+						StartTime:     startTime,
+						EndTime:       time.Now(),
+						ExecuteBy:     plan.currentNode,
+					}
 					tunnel <- backupResult
 				}
 			}()
