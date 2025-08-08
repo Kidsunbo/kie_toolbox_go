@@ -310,26 +310,8 @@ func (n *nodeExecutor[T]) asyncRunNode(ctx context.Context, batch []*nodeBox[T],
 	for _, node := range batch {
 		node := node
 		plan.runningNodes[node.Node.Name()] = struct{}{}
-		startTime := time.Now()
+		// This function should not use defer and recover because there is SafeRun can do this stuff. Hand off the decision to users.
 		go func() {
-			defer func() {
-				if a := recover(); a != nil {
-					backupResult := &ExecuteResult{
-						BoxName:       node.BoxName,
-						OriginalName:  node.Node.Name(),
-						Node:          node.Node,
-						Success:       false,
-						Err:           fmt.Errorf("panic: %v", a),
-						IsPanic:       true,
-						RunInParallel: plan.inParallel.Load(),
-						StartTime:     startTime,
-						EndTime:       time.Now(),
-						ExecuteBy:     plan.currentNode,
-					}
-					tunnel <- backupResult
-				}
-			}()
-
 			result := n.runOneNode(ctx, node, state, plan)
 			tunnel <- result
 		}()
