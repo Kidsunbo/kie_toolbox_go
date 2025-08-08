@@ -830,7 +830,7 @@ func TestTimeoutAndError(t *testing.T) {
 	assert.Less(t, now.Sub(plan.GetStartTime()).Seconds(), 1.5)
 
 	plan = nil
-	eng = NewEngine[*State]("")
+	eng = NewEngine[*State]("", SafeRun)
 	assert.NoError(t, AddNode(eng, NewNodeType2("Type2_1", []*Dependency[*State]{
 		node.StaticDependency("TypeError_1"), node.StaticDependency("TypePanic_1"),
 	})))
@@ -865,6 +865,23 @@ func TestTimeoutAndError(t *testing.T) {
 
 	chain := plan.GetChainNodes()
 	assert.Equal(t, []string{"Type2_1", "PlanExtractor"}, chain)
+
+	plan = nil
+	eng = NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType2("Type2_1", []*Dependency[*State]{
+		node.StaticDependency("Type1_1"),
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_1", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePanicType("TypePanic_1", nil)))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+	assert.NoError(t, eng.Prepare())
+
+	state = new(State)
+	assert.Panics(t, func() {
+		_ = eng.Run(context.Background(), state, "Type2_1", "TypePanic_1", "PlanExtractor")
+	})
+	assert.Nil(t, plan)
+	assert.ElementsMatch(t, []string{"Type1_1", "Type2_1"}, state.Stamps)
 }
 
 func TestAddNodesDynamically(t *testing.T) {
