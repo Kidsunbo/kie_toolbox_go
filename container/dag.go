@@ -647,20 +647,18 @@ func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, onlyOneBatch bool
 		alreadyDoneDeps[name] = d.collectDependentKeys(name, reverse)
 	}
 	if needUpdateCache {
-		func() {
-			d.cacheLock.Lock()
-			defer d.cacheLock.Unlock()
-			cache := d.cachedVertexTopo
-			if reverse {
-				cache = d.cachedReverseVertex
-			}
-			for name, dep := range deps {
-				cache[name] = dep
-			}
-			for name, dep := range alreadyDoneDeps {
-				cache[name] = dep
-			}
-		}()
+		d.cacheLock.Lock()
+		cache := d.cachedVertexTopo
+		if reverse {
+			cache = d.cachedReverseVertex
+		}
+		for name, dep := range deps {
+			cache[name] = dep
+		}
+		for name, dep := range alreadyDoneDeps {
+			cache[name] = dep
+		}
+		d.cacheLock.Unlock()
 	}
 
 	if reverse {
@@ -812,16 +810,13 @@ func (d *Dag[K, T]) canReach(from, to K) (bool, error) {
 		return false, errors.New(d.message(notCheckAcyclicityError))
 	}
 
-	cached, exist := func() (bool, bool) {
-		d.cacheLock.RLock()
-		defer d.cacheLock.RUnlock()
-		keys, cached := d.cachedVertexTopo[from]
-		if !cached {
-			return cached, false
-		}
-		_, exist := keys[to]
-		return cached, exist
-	}()
+	exist = false
+	d.cacheLock.RLock()
+	keys, cached := d.cachedVertexTopo[from]
+	if cached {
+		_, exist = keys[to]
+	}
+	d.cacheLock.RUnlock()
 
 	if !cached {
 		d.cacheLock.Lock()
