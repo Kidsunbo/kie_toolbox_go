@@ -580,15 +580,17 @@ func (d *Dag[K, T]) TopologicalBatch(params ...any) ([][]T, error) {
 
 func (d *Dag[K, T]) topologicalBatch(params ...any) ([][]T, error) {
 	target := d.setPool.Get().(map[K]struct{})
-	reverse := false
 	alreadyDone := d.setPool.Get().(map[K]struct{})
-	onlyOneBatch := false
 	defer func() {
 		clear(target)
 		clear(alreadyDone)
 		d.setPool.Put(target)
 		d.setPool.Put(alreadyDone)
 	}()
+	
+	reverse := false
+	onlyOneBatch := false
+
 
 	for _, param := range params {
 		if v, ok := param.(Flag); ok {
