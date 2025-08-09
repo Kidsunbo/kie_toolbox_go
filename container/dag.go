@@ -472,8 +472,14 @@ func (d *Dag[K, T]) topologicalSort() ([]T, error) {
 		return d.flatten(cachedFullTopo), nil
 	}
 
-	removed := make(map[K]struct{})
-	vertices := make(map[K]struct{})
+	removed := d.setPool.Get().(map[K]struct{})
+	vertices := d.setPool.Get().(map[K]struct{})
+	defer func() {
+		clear(removed)
+		clear(vertices)
+		d.setPool.Put(removed)
+		d.setPool.Put(vertices)
+	}()
 
 	for k := range d.vertices {
 		vertices[k] = struct{}{}
