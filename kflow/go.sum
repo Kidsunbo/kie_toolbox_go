@@ -1,7 +1,3 @@
-github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250730035714-06274030c8f1 h1:/4EgJqt4TF5+z6iNE7Ehk8rto/15KyG2fMM4akMYGaY=
-github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250730035714-06274030c8f1/go.mod h1:wFCO1IfbovzpisLFQ63cd3JoKAWifNCil3rI2k0BoQc=
-github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250808055302-6bc64fa1b215 h1:DYm02ktyTQXVkCGlmt/k5RFKFPqVVo0WmB0FVttUkl8=
-github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250808055302-6bc64fa1b215/go.mod h1:wFCO1IfbovzpisLFQ63cd3JoKAWifNCil3rI2k0BoQc=
 github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250809081324-bcb25d2a5c74 h1:8eHhPa7QymJSx3IdYN1Up82wmhzCJkXh5W0I3UhqIWI=
 github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20250809081324-bcb25d2a5c74/go.mod h1:wFCO1IfbovzpisLFQ63cd3JoKAWifNCil3rI2k0BoQc=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
