@@ -123,6 +123,8 @@ type Dag[K comparable, T any] struct {
 	name         string
 	vertices     map[K]*vertex[K, T]
 	language     int8
+	setPool      sync.Pool
+	setSetPool   sync.Pool
 
 	checked             atomic.Bool
 	cacheLock           sync.RWMutex
@@ -154,6 +156,16 @@ func NewDag[K comparable, T any](name string, params ...any) *Dag[K, T] {
 		name:         name,
 		vertices:     map[K]*vertex[K, T]{},
 		language:     language,
+		setPool: sync.Pool{
+			New: func() any {
+				return make(map[K]struct{})
+			},
+		},
+		setSetPool: sync.Pool{
+			New: func() any {
+				return make(map[K]map[K]struct{})
+			},
+		},
 	}
 }
 
@@ -561,10 +573,17 @@ func (d *Dag[K, T]) TopologicalBatch(params ...any) ([][]T, error) {
 }
 
 func (d *Dag[K, T]) topologicalBatch(params ...any) ([][]T, error) {
-	target := make(map[K]struct{})
+	target := d.setPool.Get().(map[K]struct{})
 	reverse := false
-	alreadyDone := make(map[K]struct{})
+	alreadyDone := d.setPool.Get().(map[K]struct{})
 	onlyOneBatch := false
+	defer func() {
+		clear(target)
+		clear(alreadyDone)
+		d.setPool.Put(target)
+		d.setPool.Put(alreadyDone)
+	}()
+
 	for _, param := range params {
 		if v, ok := param.(Flag); ok {
 			if v == Reverse {
@@ -610,8 +629,14 @@ func (d *Dag[K, T]) topologicalBatch(params ...any) ([][]T, error) {
 }
 
 func (d *Dag[K, T]) topologicalBatchForSpecified(reverse bool, onlyOneBatch bool, alreadyDone map[K]struct{}, names map[K]struct{}) ([][]T, error) {
-	deps := make(map[K]map[K]struct{}, len(names))
-	alreadyDoneDeps := make(map[K]map[K]struct{}, len(alreadyDone))
+	deps := d.setSetPool.Get().(map[K]map[K]struct{})
+	alreadyDoneDeps := d.setSetPool.Get().(map[K]map[K]struct{})
+	defer func() {
+		clear(deps)
+		clear(alreadyDoneDeps)
+		d.setSetPool.Put(deps)
+		d.setSetPool.Put(alreadyDoneDeps)
+	}()
 
 	// this will boost the speed than lock in every loop
 	d.cacheLock.RLock()
@@ -686,15 +711,24 @@ func (d *Dag[K, T]) collectDependentKeys(name K, reverse bool) map[K]struct{} {
 }
 
 func (d *Dag[K, T]) calculateTopologicalBatchSequentially(onlyOneBatch bool, deps map[K]map[K]struct{}, alreadyDoneDeps map[K]map[K]struct{}) [][]T {
-	removed := make(map[K]struct{}, len(d.vertices))
+	removed := d.setPool.Get().(map[K]struct{})
+	vertices := d.setPool.Get().(map[K]struct{})
+	limitation := d.setPool.Get().(map[K]struct{})
+	defer func() {
+		clear(removed)
+		clear(vertices)
+		clear(limitation)
+		d.setPool.Put(removed)
+		d.setPool.Put(vertices)
+		d.setPool.Put(limitation)
+	}()
+
 	for _, dep := range alreadyDoneDeps {
 		for k := range dep {
 			removed[k] = struct{}{}
 		}
 	}
 
-	vertices := make(map[K]struct{}, len(d.vertices))
-	limitation := make(map[K]struct{}, len(d.vertices))
 	for _, dep := range deps {
 		for k := range dep {
 			if _, exist := removed[k]; exist {
@@ -729,15 +763,24 @@ func (d *Dag[K, T]) calculateTopologicalBatchSequentially(onlyOneBatch bool, dep
 }
 
 func (d *Dag[K, T]) calculateTopologicalBatchReversely(onlyOneBatch bool, deps map[K]map[K]struct{}, alreadyDoneDeps map[K]map[K]struct{}) [][]T {
-	removed := make(map[K]struct{}, len(d.vertices))
+	removed := d.setPool.Get().(map[K]struct{})
+	vertices := d.setPool.Get().(map[K]struct{})
+	limitation := d.setPool.Get().(map[K]struct{})
+	defer func() {
+		clear(removed)
+		clear(vertices)
+		clear(limitation)
+		d.setPool.Put(removed)
+		d.setPool.Put(vertices)
+		d.setPool.Put(limitation)
+	}()
+
 	for _, dep := range alreadyDoneDeps {
 		for k := range dep {
 			removed[k] = struct{}{}
 		}
 	}
 
-	vertices := make(map[K]struct{}, len(d.vertices))
-	limitation := make(map[K]struct{}, len(d.vertices))
 	for _, dep := range deps {
 		for k := range dep {
 			if _, exist := removed[k]; exist {
