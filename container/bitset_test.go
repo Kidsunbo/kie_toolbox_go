@@ -73,6 +73,9 @@ func TestAtomicBitSet_All(t *testing.T) {
 	if !bs.All(0, 10) {
 		t.Errorf("All should be true when all bits are set")
 	}
+	if !bs.All(0, 256) {
+		t.Errorf("All should be true for range where all bits are set")
+	}
 	bs.Clear(5)
 	if bs.All(0, 10) {
 		t.Errorf("All should be false when a bit is cleared")
@@ -80,12 +83,12 @@ func TestAtomicBitSet_All(t *testing.T) {
 	if !bs.All(0, 5) {
 		t.Errorf("All should be true for range where all bits are set")
 	}
-	if !bs.All(0, 256) {
-		t.Errorf("All should be true for range where all bits are set")
+	if bs.All(0, 256) {
+		t.Errorf("All should be false for range where all bits are set")
 	}
 }
 
-func TestAtomicBitSet_Panics(t *testing.T) {
+func TestAtomicBitSet_PanicsSet(t *testing.T) {
 	bs := NewAtomicBitSet(10)
 	defer func() {
 		if r := recover(); r == nil {
@@ -95,7 +98,7 @@ func TestAtomicBitSet_Panics(t *testing.T) {
 	bs.Set(100)
 }
 
-func TestAtomicBitSet_Panics2(t *testing.T) {
+func TestAtomicBitSet_PanicsSet1(t *testing.T) {
 	bs := NewAtomicBitSet(10)
 	defer func() {
 		if r := recover(); r == nil {
@@ -105,12 +108,82 @@ func TestAtomicBitSet_Panics2(t *testing.T) {
 	bs.Set(-1)
 }
 
-func TestAtomicBitSet_Panics3(t *testing.T) {
+func TestAtomicBitSet_PanicsGet(t *testing.T) {
 	bs := NewAtomicBitSet(10)
 	defer func() {
 		if r := recover(); r == nil {
 			t.Errorf("Expected panic for out of range bit")
 		}
 	}()
-	bs.Set(100)
+	bs.Get(100)
+}
+
+func TestAtomicBitSet_PanicsGet1(t *testing.T) {
+	bs := NewAtomicBitSet(10)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic for out of range bit")
+		}
+	}()
+	bs.Get(-1)
+}
+
+func TestAtomicBitSet_PanicsAll(t *testing.T) {
+	bs := NewAtomicBitSet(10)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic for out of range bit")
+		}
+	}()
+	bs.All(-1, 5)
+}
+
+func TestAtomicBitSet_PanicsAll2(t *testing.T) {
+	bs := NewAtomicBitSet(10)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic for out of range bit")
+		}
+	}()
+	bs.All(5, 100)
+}
+
+func TestAtomicBitSet_PanicsAll3(t *testing.T) {
+	bs := NewAtomicBitSet(10)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic for out of range bit")
+		}
+	}()
+	bs.All(5, 1)
+}
+
+func TestAtomicBitSet_PanicsAny(t *testing.T) {
+	bs := NewAtomicBitSet(10)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic for out of range bit")
+		}
+	}()
+	bs.Any(-1, 5)
+}
+
+func TestAtomicBitSet_PanicsAny2(t *testing.T) {
+	bs := NewAtomicBitSet(10)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic for out of range bit")
+		}
+	}()
+	bs.Any(5, 100)
+}
+
+func TestAtomicBitSet_PanicsAny3(t *testing.T) {
+	bs := NewAtomicBitSet(10)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic for out of range bit")
+		}
+	}()
+	bs.Any(5, 1)
 }
