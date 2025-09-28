@@ -1,4 +1,5 @@
 package container
+
 import (
 	"testing"
 )
@@ -59,11 +60,14 @@ func TestAtomicBitSet_Any(t *testing.T) {
 	if !bs.Any(90, 100) {
 		t.Errorf("Any should be true for range including bit 99")
 	}
+	if !bs.Any(1, 128) {
+		t.Errorf("Any should be true for range including bit 10, 50, 99")
+	}
 }
 
 func TestAtomicBitSet_All(t *testing.T) {
-	bs := NewAtomicBitSet(10)
-	for i := 0; i < 10; i++ {
+	bs := NewAtomicBitSet(256)
+	for i := range 256 {
 		bs.Set(i)
 	}
 	if !bs.All(0, 10) {
@@ -76,9 +80,32 @@ func TestAtomicBitSet_All(t *testing.T) {
 	if !bs.All(0, 5) {
 		t.Errorf("All should be true for range where all bits are set")
 	}
+	if !bs.All(0, 256) {
+		t.Errorf("All should be true for range where all bits are set")
+	}
 }
 
 func TestAtomicBitSet_Panics(t *testing.T) {
+	bs := NewAtomicBitSet(10)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic for out of range bit")
+		}
+	}()
+	bs.Set(100)
+}
+
+func TestAtomicBitSet_Panics2(t *testing.T) {
+	bs := NewAtomicBitSet(10)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic for out of range bit")
+		}
+	}()
+	bs.Set(-1)
+}
+
+func TestAtomicBitSet_Panics3(t *testing.T) {
 	bs := NewAtomicBitSet(10)
 	defer func() {
 		if r := recover(); r == nil {
