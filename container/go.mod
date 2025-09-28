@@ -1,6 +1,6 @@
 module github.com/Kidsunbo/kie_toolbox_go/container
 
-go 1.21
+go 1.23
 
 require github.com/stretchr/testify v1.10.0
 

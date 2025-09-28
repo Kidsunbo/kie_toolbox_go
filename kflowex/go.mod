@@ -1,6 +1,6 @@
 module github.com/Kidsunbo/kie_toolbox_go/kflowex
 
-go 1.21
+go 1.23
 
 require (
 	github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20250809081324-bcb25d2a5c74
