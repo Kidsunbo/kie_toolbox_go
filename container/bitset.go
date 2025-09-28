@@ -8,34 +8,34 @@ type AtomicBitSet struct {
 	bits []atomic.Uint64
 }
 
-func NewAtomicBitSet(bits int) AtomicBitSet {
-	return AtomicBitSet{
+func NewAtomicBitSet(bits int) *AtomicBitSet {
+	return &AtomicBitSet{
 		bits: make([]atomic.Uint64, (bits+63)>>6),
 	}
 }
 
-func (a AtomicBitSet) Set(bit int) {
+func (a *AtomicBitSet) Set(bit int) {
 	if bit < 0 || bit >= len(a.bits)<<6 {
 		panic("bit index out of range")
 	}
 	a.bits[bit>>6].Or(1 << (bit & 63))
 }
 
-func (a AtomicBitSet) Clear(bit int) {
+func (a *AtomicBitSet) Clear(bit int) {
 	if bit < 0 || bit >= len(a.bits)<<6 {
 		panic("bit index out of range")
 	}
 	a.bits[bit>>6].And(^uint64(1 << (bit & 63)))
 }
 
-func (a AtomicBitSet) Get(bit int) bool {
+func (a *AtomicBitSet) Get(bit int) bool {
 	if bit < 0 || bit >= len(a.bits)<<6 {
 		panic("bit index out of range")
 	}
 	return a.bits[bit>>6].Load()&(1<<(bit&63)) != 0
 }
 
-func (a AtomicBitSet) Any(start int, end int) bool {
+func (a *AtomicBitSet) Any(start int, end int) bool {
 	if start < 0 || end < 0 || start >= end {
 		panic("invalid range")
 	}
@@ -61,7 +61,7 @@ func (a AtomicBitSet) Any(start int, end int) bool {
 	return a.bits[endWord].Load()&((uint64(1)<<(endBit+1))-1) != 0
 }
 
-func (a AtomicBitSet) All(start int, end int) bool {
+func (a *AtomicBitSet) All(start int, end int) bool {
 	if start < 0 || end < 0 || start >= end {
 		panic("invalid range")
 	}
