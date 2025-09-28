@@ -8,8 +8,8 @@ type AtomicBitSet struct {
 	bits []atomic.Uint64
 }
 
-func NewAtomicBitSet(bits int) *AtomicBitSet {
-	return &AtomicBitSet{
+func NewAtomicBitSet(bits int) AtomicBitSet {
+	return AtomicBitSet{
 		bits: make([]atomic.Uint64, (bits+63)>>6),
 	}
 }
