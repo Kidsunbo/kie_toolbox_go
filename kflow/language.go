@@ -18,6 +18,7 @@ const (
 	nodeNotExist
 	nodeHasFailedDependency
 	underlineNodeHasExecuted
+	underlineNodeHasFailed
 	conditionEvaludateToFalse
 	unsupportedNodeType
 	nodeTimeoutError
@@ -32,6 +33,7 @@ var msg = map[textIndexType]languagePack{
 	nodeNotExist:                    {Chinese: "节点[%v]不存在", English: "node [%v] does not exist"},
 	nodeHasFailedDependency:         {Chinese: "节点[%v]存在执行失败的依赖节点[%v]", English: "node [%v] has failed dependent node [%v]"},
 	underlineNodeHasExecuted:        {Chinese: "底层节点[%v]已经执行完成", English: "underline node [%v] has already been executed"},
+	underlineNodeHasFailed:          {Chinese: "底层节点[%v]执行失败", English: "underline node [%v] has failed"},
 	conditionEvaludateToFalse:       {Chinese: "节点[%v]要求的条件不满足", English: "the condition result doesn't meet the requirement of node [%v]"},
 	unsupportedNodeType:             {Chinese: "节点[%v]的类型不支持", English: "the type of node [%v] isn't supported"},
 	nodeTimeoutError:                {Chinese: "节点运行超时", English: "node exeuctes timeout"},
