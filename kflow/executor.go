@@ -203,6 +203,23 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 	startTime := time.Now()
 	// check if it has already executed by other nodes with the same underline node.
 	if contains(plan.finishedOriginalNodes, originalName) {
+		if node.Condition != nil && contains(plan.failedNodes, originalName) {
+			result := &ExecuteResult{
+				BoxName:       node.BoxName,
+				OriginalName:  originalName,
+				Node:          node.Node,
+				RunInParallel: plan.inParallel.Load(),
+				IsPanic:       false,
+				Skipped:       true,
+				Success:       false,
+				SkippedReason: fmt.Sprintf(message(plan.config.Language, underlineNodeHasFailed), originalName),
+				StartTime:     startTime,
+				EndTime:       time.Now(),
+				ExecuteBy:     plan.currentNode,
+			}
+			return false, result, nil
+		}
+
 		result := &ExecuteResult{
 			BoxName:       node.BoxName,
 			OriginalName:  originalName,

@@ -884,6 +884,108 @@ func TestTimeoutAndError(t *testing.T) {
 	assert.ElementsMatch(t, []string{"Type1_1", "Type2_1"}, state.Stamps)
 }
 
+func TestIndirectError(t *testing.T) {
+	node := new(Node[*State])
+
+	var plan *Plan
+
+	eng := NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_1", []string{
+		"TypeError_1", "Type1_5",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeErrorType("TypeError_1", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeErrorType("TypeError_2", []string{"Type1_2"})))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_2", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_3", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_4", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_5", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_6", []string{
+		"TypeError_2",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type4_1", []*Dependency[*State]{
+		node.ConditionalDependency("Type1_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_3"}),
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type4_2", []*Dependency[*State]{
+		node.ConditionalDependency("Type1_6", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_3"}),
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type4_3", []*Dependency[*State]{
+		node.ConditionalDependency("Type1_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_3"}),
+		node.ConditionalDependency("Type1_6", func(ctx context.Context, s *State) bool { return false }, []string{"Type1_4"}),
+	})))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+	assert.NoError(t, eng.Prepare())
+
+	state := new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type4_1", "PlanExtractor"))
+	result, err := plan.GetExecuteResult()
+	assert.Nil(t, err)
+	assert.Equal(t, 7, len(result))
+	assert.Equal(t, []string{"Type1_3", "Type1_5", "PlanExtractor"}, state.Stamps)
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_5"].Success)
+	assert.False(t, plan.finishedNodes["TypeError_1"].Success)
+	assert.False(t, plan.finishedNodes["TypeError_1"].Skipped)
+	assert.Error(t, plan.finishedNodes["TypeError_1"].Err)
+
+	assert.False(t, plan.finishedNodes["Type1_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_1"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type1_1"].Err)
+
+	assert.False(t, plan.finishedNodes["Type1_1_by_Type4_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_1_by_Type4_1"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type1_1_by_Type4_1"].Err)
+
+	assert.False(t, plan.finishedNodes["Type4_1"].Success)
+	assert.True(t, plan.finishedNodes["Type4_1"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type4_1"].Err)
+
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type4_2", "PlanExtractor"))
+	result, err = plan.GetExecuteResult()
+	assert.Nil(t, err)
+	assert.Equal(t, 4, len(result))
+	assert.Equal(t, []string{"Type1_3", "Type4_2", "PlanExtractor"}, state.Stamps)
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type4_2"].Success)
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type4_3", "PlanExtractor"))
+	result, err = plan.GetExecuteResult()
+	assert.Nil(t, err)
+	assert.Equal(t, 9, len(result))
+	assert.ElementsMatch(t, []string{"Type1_3", "Type1_4"}, state.Stamps[:2])
+	assert.Equal(t, []string{"Type1_5", "PlanExtractor"}, state.Stamps[2:])
+	assert.True(t, plan.finishedNodes["Type1_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_4"].Success)
+	assert.True(t, plan.finishedNodes["Type1_5"].Success)
+
+	assert.False(t, plan.finishedNodes["TypeError_1"].Success)
+	assert.False(t, plan.finishedNodes["TypeError_1"].Skipped)
+	assert.Error(t, plan.finishedNodes["TypeError_1"].Err)
+
+	assert.False(t, plan.finishedNodes["Type1_1"].Success)
+	assert.True(t, plan.finishedNodes["Type1_1"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type1_1"].Err)
+
+	assert.False(t, plan.finishedNodes["Type1_1_by_Type4_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_1_by_Type4_3"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type1_1_by_Type4_3"].Err)
+
+	assert.True(t, plan.finishedNodes["Type1_6_by_Type4_3"].Success)
+	assert.True(t, plan.finishedNodes["Type1_6_by_Type4_3"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type1_6_by_Type4_3"].Err)
+
+	assert.False(t, plan.finishedNodes["Type4_3"].Success)
+	assert.True(t, plan.finishedNodes["Type4_3"].Skipped)
+	assert.NoError(t, plan.finishedNodes["Type4_3"].Err)
+
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
+
+}
+
 func TestAddNodesDynamically(t *testing.T) {
 	node := new(Node[*State])
 
