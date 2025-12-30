@@ -1091,8 +1091,12 @@ func TestIndirectError3(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeErrorType("TypeError_2", []string{"Type1_2"})))
 	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_2", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_3", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_4", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_5", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType4("Type4_1", []*Dependency[*State]{
 		node.ConditionalDependency("Type1_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_3", "TypeError_2"}),
+		node.ConditionalDependency("Type1_4", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_3", "TypeError_2"}),
+		node.ConditionalDependency("Type1_5", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_3", "TypeError_2"}),
 	})))
 	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
 	assert.NoError(t, eng.Prepare())
@@ -1103,7 +1107,7 @@ func TestIndirectError3(t *testing.T) {
 	assert.NoError(t, eng.Run(context.Background(), state, "TypeError_1", "Type4_1", "PlanExtractor"))
 	result, err := plan.GetExecuteResult()
 	assert.Nil(t, err)
-	assert.Equal(t, 7, len(result))
+	assert.Equal(t, 9, len(result))
 	assert.ElementsMatch(t, []string{"Type1_3", "Type1_2"}, state.Stamps[0:2])
 	assert.Nil(t, plan.finishedNodes["Type1_1"])
 
@@ -1125,6 +1129,18 @@ func TestIndirectError3(t *testing.T) {
 	assert.True(t, plan.finishedNodes["Type1_1_by_Type4_1"].Conditional())
 	assert.NoError(t, plan.finishedNodes["Type1_1_by_Type4_1"].Err)
 	assert.Equal(t, "节点[Type1_1_by_Type4_1]存在执行失败的依赖节点[TypeError_2]", plan.finishedNodes["Type1_1_by_Type4_1"].SkippedReason)
+
+	assert.False(t, plan.finishedNodes["Type1_4_by_Type4_1"].Success())
+	assert.True(t, plan.finishedNodes["Type1_4_by_Type4_1"].Skipped())
+	assert.True(t, plan.finishedNodes["Type1_4_by_Type4_1"].Conditional())
+	assert.NoError(t, plan.finishedNodes["Type1_4_by_Type4_1"].Err)
+	assert.Equal(t, "节点[Type1_4_by_Type4_1]存在执行失败的依赖节点[TypeError_2]", plan.finishedNodes["Type1_4_by_Type4_1"].SkippedReason)
+
+	assert.False(t, plan.finishedNodes["Type1_5_by_Type4_1"].Success())
+	assert.True(t, plan.finishedNodes["Type1_5_by_Type4_1"].Skipped())
+	assert.True(t, plan.finishedNodes["Type1_5_by_Type4_1"].Conditional())
+	assert.NoError(t, plan.finishedNodes["Type1_5_by_Type4_1"].Err)
+	assert.Equal(t, "节点[Type1_5_by_Type4_1]存在执行失败的依赖节点[TypeError_2]", plan.finishedNodes["Type1_5_by_Type4_1"].SkippedReason)
 
 	assert.False(t, plan.finishedNodes["Type4_1"].Success())
 	assert.True(t, plan.finishedNodes["Type4_1"].Skipped())
