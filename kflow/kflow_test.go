@@ -1038,6 +1038,46 @@ func TestIndirectError2(t *testing.T) {
 
 	assert.True(t, plan.finishedNodes["PlanExtractor"].Success())
 
+	state = new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type1_1", "Type4_1", "PlanExtractor"))
+	result, err = plan.GetExecuteResult()
+	assert.Nil(t, err)
+	assert.Equal(t, 8, len(result))
+	assert.Equal(t, []string{"Type1_2", "Type1_3", "PlanExtractor"}, state.Stamps)
+
+	
+
+	assert.True(t, plan.finishedNodes["Type1_3"].Success())
+	assert.True(t, plan.finishedNodes["Type1_3"].RunInParallel())
+	assert.True(t, plan.finishedNodes["Type1_2"].Success())
+	assert.True(t, plan.finishedNodes["Type1_2"].RunInParallel())
+
+	assert.False(t, plan.finishedNodes["TypeError_2"].Success())
+	assert.False(t, plan.finishedNodes["TypeError_2"].Skipped())
+	assert.Error(t, plan.finishedNodes["TypeError_2"].Err)
+
+	assert.False(t, plan.finishedNodes["TypeError_1"].Success())
+	assert.False(t, plan.finishedNodes["TypeError_1"].Skipped())
+	assert.Error(t, plan.finishedNodes["TypeError_1"].Err)
+
+	assert.False(t, plan.finishedNodes["Type1_1"].Success())
+	assert.True(t, plan.finishedNodes["Type1_1"].Skipped())
+	assert.Equal(t, "节点[Type1_1]存在执行失败的依赖节点[TypeError_1]", plan.finishedNodes["Type1_1"].SkippedReason)
+	assert.NoError(t, plan.finishedNodes["Type1_1"].Err)
+
+	assert.False(t, plan.finishedNodes["Type1_1_by_Type4_1"].Success())
+	assert.True(t, plan.finishedNodes["Type1_1_by_Type4_1"].Skipped())
+	assert.True(t, plan.finishedNodes["Type1_1_by_Type4_1"].Conditional())
+	assert.NoError(t, plan.finishedNodes["Type1_1_by_Type4_1"].Err)
+	assert.Equal(t, "底层节点[Type1_1]执行失败", plan.finishedNodes["Type1_1_by_Type4_1"].SkippedReason)
+
+	assert.False(t, plan.finishedNodes["Type4_1"].Success())
+	assert.True(t, plan.finishedNodes["Type4_1"].Skipped())
+	assert.Contains(t, []string{"节点[Type4_1]存在执行失败的依赖节点[TypeError_2]", "节点[Type4_1]存在执行失败的依赖节点[Type1_1]"}, plan.finishedNodes["Type4_1"].SkippedReason)
+	assert.NoError(t, plan.finishedNodes["Type4_1"].Err)
+
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success())
+
 }
 
 func TestAddNodesDynamically(t *testing.T) {
