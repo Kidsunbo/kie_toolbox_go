@@ -1,7 +1,7 @@
-github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20251230104922-2916d1a25282 h1:mU1s1xC8UV+3fn2unln1Ti6S8cbWMENKTpGSLhFw1OI=
-github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20251230104922-2916d1a25282/go.mod h1:xgLwqquh/NhH26vMA4WDMbzcWMxBxdfaENOsx7W4KHA=
-github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20251230104922-2916d1a25282 h1:EKhMSKsT+NYINxlW4fw9VHupBkMGIsEXy0mQ6w5BRTg=
-github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20251230104922-2916d1a25282/go.mod h1:+uyGzcPNjyYhtWA1lwVHLsN2kaCOS7XEsyIVRIxPVng=
+github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20251230123437-ca0aef013aa4 h1:2ll0wdu2+lz8uimri4T4uuknncpJKDHfrS4z5cRcwWc=
+github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20251230123437-ca0aef013aa4/go.mod h1:xgLwqquh/NhH26vMA4WDMbzcWMxBxdfaENOsx7W4KHA=
+github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20251230123437-ca0aef013aa4 h1:IBmEs+1FqS3aozwFxEcpncXYfHknD5Z8uFijWlB+z0k=
+github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20251230123437-ca0aef013aa4/go.mod h1:+uyGzcPNjyYhtWA1lwVHLsN2kaCOS7XEsyIVRIxPVng=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
