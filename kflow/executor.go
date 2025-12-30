@@ -339,9 +339,14 @@ func (n *nodeExecutor[T]) hasFailedDependency(nodes *container.Dag[string, *node
 			return false, "", err
 		}
 		if canReach {
-			// check if the failed node is a conditional node. If it is, return its original name. The conditional node only fails and skips when its underline node fails.
 			if failedNode := plan.finishedNodes[key]; failedNode.Conditional() && failedNode.Skipped() {
-				return true, failedNode.OriginalName, nil
+				// if the node is a conditional node, failed and skipped, there are two situations:
+				// 	1. the underline node is failed, then we should return the underline node as the failed node.
+				// 	2. the dependency of condition is failed, then we should skip the conditional node check to loop until the failed dependency is met.
+				if contains(plan.failedNodes, failedNode.OriginalName) {
+					return true, failedNode.OriginalName, nil
+				}
+				continue
 			}
 			return true, key, nil
 		}

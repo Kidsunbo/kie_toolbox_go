@@ -1014,6 +1014,8 @@ func TestIndirectError2(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 6, len(result))
 	assert.ElementsMatch(t, []string{"Type1_3", "Type1_2"}, state.Stamps[0:2])
+	assert.Nil(t, plan.finishedNodes["Type1_1"])
+
 	assert.True(t, plan.finishedNodes["Type1_3"].Success())
 	assert.True(t, plan.finishedNodes["Type1_3"].RunInParallel())
 	assert.True(t, plan.finishedNodes["Type1_2"].Success())
