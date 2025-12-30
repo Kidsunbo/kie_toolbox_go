@@ -3,12 +3,12 @@ module github.com/Kidsunbo/kie_toolbox_go/kflowex
 go 1.23
 
 require (
-	github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20251230104922-2916d1a25282
+	github.com/Kidsunbo/kie_toolbox_go/kflow v0.0.0-20251230123437-ca0aef013aa4
 	github.com/stretchr/testify v1.10.0
 )
 
 require (
-	github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20251230104922-2916d1a25282 // indirect
+	github.com/Kidsunbo/kie_toolbox_go/container v0.0.0-20251230123437-ca0aef013aa4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
