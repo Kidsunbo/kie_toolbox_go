@@ -61,7 +61,7 @@ type ExecuteResult struct {
 	EndTime       time.Time // when the node is ended
 	ExecuteBy     string    // the name of specified node which passed with run method which execute the current node
 
-	state uint32 // the state of node after execution
+	state uint8 // the state of node after execution
 }
 
 func (e *ExecuteResult) setState(bit uint32) {
