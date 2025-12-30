@@ -171,10 +171,6 @@ func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *nodeBox[T], stat
 		result.SetRunInParallel()
 	}
 
-	if node.Condition != nil {
-		panic("No!!!")
-	}
-
 	err, isPanic := safeRun(plan.config, func() error {
 		if basicNode, ok := node.Node.(IBasicNode[T]); ok {
 			err := basicNode.Run(ctx, state)
