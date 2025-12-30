@@ -113,7 +113,7 @@ func RemoveResult[T any](plan *Plan, target string) error {
 		} else if ok {
 			delete(plan.finishedNodes, key)
 			delete(plan.finishedOriginalNodes, key)
-			if !result.Success {
+			if !result.Success() {
 				delete(plan.failedNodes, key)
 			}
 		}

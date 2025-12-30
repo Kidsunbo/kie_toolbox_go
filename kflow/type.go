@@ -54,16 +54,67 @@ type Dependency[T any] struct {
 type ExecuteResult struct {
 	BoxName       string    // the name of this NodeBox
 	OriginalName  string    // the name of the original node
-	Node          INode     // the node object that is for some flow nodes to use
-	Success       bool      // if this execution is successful, which means the run method does not return error
+	Node          INode     // the node object that is for some flow nodes to use.
 	Err           error     // if the execution is failed, the error message
-	IsPanic       bool      // if the execution is panic. The panic will be recovered when SafeRun is enabled, user can use this field to detect if there is a panic. If SafeRun is disabled, this field will always be false.
-	RunInParallel bool      // if the node is running in parallel.
-	Skipped       bool      // if the node is skipped
 	SkippedReason string    // if the node is skipped, this field indicates the reason
 	StartTime     time.Time // when the node is started
 	EndTime       time.Time // when the node is ended
 	ExecuteBy     string    // the name of specified node which passed with run method which execute the current node
+
+	state int32 // the state of node after execution
+}
+
+func (e *ExecuteResult) setState(bit int32) {
+	e.state |= (1 << bit)
+}
+
+func (e *ExecuteResult) getState(bit int32) bool {
+	return e.state&(1<<bit) != 0
+}
+
+// if this execution is successful, which means the run method does not return error
+func (e *ExecuteResult) Success() bool {
+	return e.getState(0)
+}
+
+func (e *ExecuteResult) SetSuccess() {
+	e.setState(0)
+}
+
+// if the execution is panic. The panic will be recovered when SafeRun is enabled, user can use this field to detect if there is a panic. If SafeRun is disabled, this field will always be false.
+func (e *ExecuteResult) Panic() bool {
+	return e.getState(1)
+}
+
+func (e *ExecuteResult) SetPanic() {
+	e.setState(1)
+}
+
+// if the node is running in parallel.
+func (e *ExecuteResult) RunInParallel() bool {
+	return e.getState(2)
+}
+
+func (e *ExecuteResult) SetRunInParallel() {
+	e.setState(2)
+}
+
+// if the node is skipped
+func (e *ExecuteResult) Skipped() bool {
+	return e.getState(3)
+}
+
+func (e *ExecuteResult) SetSkipped() {
+	e.setState(3)
+}
+
+// if the node is conditional
+func (e *ExecuteResult) Conditional() bool {
+	return e.getState(4)
+}
+
+func (e *ExecuteResult) SetConditional() {
+	e.setState(4)
 }
 
 type Plan struct {
