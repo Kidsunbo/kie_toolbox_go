@@ -170,6 +170,7 @@ func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *nodeBox[T], stat
 	if plan.inParallel.Load() {
 		result.SetRunInParallel()
 	}
+	// conditional node will not run in runOneNode. So no need to set Conditional state here.
 
 	err, isPanic := safeRun(plan.config, func() error {
 		if basicNode, ok := node.Node.(IBasicNode[T]); ok {
@@ -289,13 +290,13 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 		})
 		if err != nil {
 			result := &ExecuteResult{
-				BoxName:       node.BoxName,
-				OriginalName:  originalName,
-				Node:          node.Node,
-				StartTime:     startTime,
-				ExecuteBy:     plan.currentNode,
-				EndTime:       time.Now(),
-				Err:           err,
+				BoxName:      node.BoxName,
+				OriginalName: originalName,
+				Node:         node.Node,
+				StartTime:    startTime,
+				ExecuteBy:    plan.currentNode,
+				EndTime:      time.Now(),
+				Err:          err,
 			}
 			result.SetConditional()
 			if isPanic {
