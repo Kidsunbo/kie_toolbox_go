@@ -69,11 +69,11 @@ func (n *nodeExecutor[T]) executeNode(ctx context.Context, nodes *container.Dag[
 
 func (n *nodeExecutor[T]) saveResult(result *ExecuteResult, plan *Plan) {
 	plan.finishedNodes[result.BoxName] = result
-	if result.BoxName == result.OriginalName {
+	if !result.Conditional() {
 		plan.finishedOriginalNodes[result.OriginalName] = struct{}{}
 		delete(plan.runningNodes, result.OriginalName)
 	}
-	if !result.Success {
+	if !result.Success() {
 		plan.failedNodes[result.BoxName] = struct{}{}
 	}
 }
@@ -161,12 +161,18 @@ func (n *nodeExecutor[T]) executeNodesInParallel(ctx context.Context, nodes *con
 
 func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *nodeBox[T], state T, plan *Plan) *ExecuteResult {
 	result := &ExecuteResult{
-		BoxName:       node.BoxName,
-		OriginalName:  node.Node.Name(),
-		Node:          node.Node,
-		RunInParallel: plan.inParallel.Load(),
-		StartTime:     time.Now(),
-		ExecuteBy:     plan.currentNode,
+		BoxName:      node.BoxName,
+		OriginalName: node.Node.Name(),
+		Node:         node.Node,
+		StartTime:    time.Now(),
+		ExecuteBy:    plan.currentNode,
+	}
+	if plan.inParallel.Load() {
+		result.SetRunInParallel()
+	}
+
+	if node.Condition != nil {
+		panic("No!!!")
 	}
 
 	err, isPanic := safeRun(plan.config, func() error {
@@ -186,14 +192,15 @@ func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *nodeBox[T], stat
 		return fmt.Errorf(message(plan.config.Language, unsupportedNodeType), node.Node.Name())
 	})
 	if err != nil {
-		result.Success = false
 		result.Err = err
-		result.IsPanic = isPanic
+		if isPanic {
+			result.SetPanic()
+		}
 		result.EndTime = time.Now()
 		return result
 	}
 
-	result.Success = true
+	result.SetSuccess()
 	result.EndTime = time.Now()
 	return result
 }
@@ -208,15 +215,16 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 				BoxName:       node.BoxName,
 				OriginalName:  originalName,
 				Node:          node.Node,
-				RunInParallel: plan.inParallel.Load(),
-				IsPanic:       false,
-				Skipped:       true,
-				Success:       false,
 				SkippedReason: fmt.Sprintf(message(plan.config.Language, underlineNodeHasFailed), originalName),
 				StartTime:     startTime,
 				EndTime:       time.Now(),
 				ExecuteBy:     plan.currentNode,
 			}
+			if plan.inParallel.Load() {
+				result.SetRunInParallel()
+			}
+			result.SetSkipped()
+			result.SetConditional()
 			return false, result, nil
 		}
 
@@ -224,15 +232,20 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 			BoxName:       node.BoxName,
 			OriginalName:  originalName,
 			Node:          node.Node,
-			RunInParallel: plan.inParallel.Load(),
-			IsPanic:       false,
-			Skipped:       true,
-			Success:       true,
 			SkippedReason: fmt.Sprintf(message(plan.config.Language, underlineNodeHasExecuted), originalName),
 			StartTime:     startTime,
 			EndTime:       time.Now(),
 			ExecuteBy:     plan.currentNode,
 		}
+		if plan.inParallel.Load() {
+			result.SetRunInParallel()
+		}
+		if node.Condition != nil {
+			result.SetConditional()
+		}
+		result.SetSuccess()
+		result.SetSkipped()
+
 		return false, result, nil
 	}
 
@@ -251,15 +264,19 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 			BoxName:       node.BoxName,
 			OriginalName:  originalName,
 			Node:          node.Node,
-			RunInParallel: plan.inParallel.Load(),
-			IsPanic:       false,
 			StartTime:     startTime,
 			ExecuteBy:     plan.currentNode,
-			Success:       false,
-			Skipped:       true,
 			SkippedReason: fmt.Sprintf(message(plan.config.Language, nodeHasFailedDependency), node.BoxName, failedNode),
 			EndTime:       time.Now(),
 		}
+		if plan.inParallel.Load() {
+			result.SetRunInParallel()
+		}
+		if node.Condition != nil {
+			result.SetConditional()
+		}
+		result.SetSkipped()
+
 		return false, result, nil
 	}
 
@@ -279,14 +296,19 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 				BoxName:       node.BoxName,
 				OriginalName:  originalName,
 				Node:          node.Node,
-				RunInParallel: plan.inParallel.Load(),
-				IsPanic:       isPanic,
 				StartTime:     startTime,
 				ExecuteBy:     plan.currentNode,
 				EndTime:       time.Now(),
 				Err:           err,
-				Success:       false,
 			}
+			result.SetConditional()
+			if isPanic {
+				result.SetPanic()
+			}
+			if plan.inParallel.Load() {
+				result.SetRunInParallel()
+			}
+
 			return false, result, nil
 		}
 		if !pass {
@@ -294,15 +316,18 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 				BoxName:       node.BoxName,
 				OriginalName:  originalName,
 				Node:          node.Node,
-				RunInParallel: plan.inParallel.Load(),
-				IsPanic:       false,
 				StartTime:     startTime,
 				ExecuteBy:     plan.currentNode,
-				Success:       true,
-				Skipped:       true,
 				SkippedReason: fmt.Sprintf(message(plan.config.Language, conditionEvaludateToFalse), node.BoxName),
 				EndTime:       time.Now(),
 			}
+			result.SetConditional()
+			result.SetSkipped()
+			result.SetSuccess()
+			if plan.inParallel.Load() {
+				result.SetRunInParallel()
+			}
+
 			return false, result, nil
 		}
 	}
@@ -318,8 +343,7 @@ func (n *nodeExecutor[T]) hasFailedDependency(nodes *container.Dag[string, *node
 		}
 		if canReach {
 			// check if the failed node is a conditional node. If it is, return its original name. The conditional node only fails and skips when its underline node fails.
-			// compare the skipped first to reduce the chance to compare strings.
-			if failedNode := plan.finishedNodes[key]; failedNode.Skipped && failedNode.BoxName != failedNode.OriginalName {
+			if failedNode := plan.finishedNodes[key]; failedNode.Conditional() && failedNode.Skipped() {
 				return true, failedNode.OriginalName, nil
 			}
 			return true, key, nil
