@@ -61,14 +61,14 @@ type ExecuteResult struct {
 	EndTime       time.Time // when the node is ended
 	ExecuteBy     string    // the name of specified node which passed with run method which execute the current node
 
-	state int32 // the state of node after execution
+	state uint32 // the state of node after execution
 }
 
-func (e *ExecuteResult) setState(bit int32) {
+func (e *ExecuteResult) setState(bit uint32) {
 	e.state |= (1 << bit)
 }
 
-func (e *ExecuteResult) getState(bit int32) bool {
+func (e *ExecuteResult) getState(bit uint32) bool {
 	return e.state&(1<<bit) != 0
 }
 
