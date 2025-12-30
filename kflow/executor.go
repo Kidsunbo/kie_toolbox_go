@@ -317,6 +317,11 @@ func (n *nodeExecutor[T]) hasFailedDependency(nodes *container.Dag[string, *node
 			return false, "", err
 		}
 		if canReach {
+			// check if the failed node is a conditional node. If it is, return its original name. The conditional node only fails and skips when its underline node fails.
+			// compare the skipped first to reduce the chance to compare strings.
+			if failedNode := plan.finishedNodes[key]; failedNode.Skipped && failedNode.BoxName != failedNode.OriginalName {
+				return true, failedNode.OriginalName, nil
+			}
 			return true, key, nil
 		}
 	}

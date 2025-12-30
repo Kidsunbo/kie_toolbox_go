@@ -937,6 +937,7 @@ func TestIndirectError(t *testing.T) {
 
 	assert.False(t, plan.finishedNodes["Type4_1"].Success)
 	assert.True(t, plan.finishedNodes["Type4_1"].Skipped)
+	assert.Equal(t, "节点[Type4_1]存在执行失败的依赖节点[Type1_1]", plan.finishedNodes["Type4_1"].SkippedReason)
 	assert.NoError(t, plan.finishedNodes["Type4_1"].Err)
 
 	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)
@@ -976,10 +977,12 @@ func TestIndirectError(t *testing.T) {
 
 	assert.True(t, plan.finishedNodes["Type1_6_by_Type4_3"].Success)
 	assert.True(t, plan.finishedNodes["Type1_6_by_Type4_3"].Skipped)
+	assert.Equal(t, "节点[Type1_6_by_Type4_3]要求的条件不满足", plan.finishedNodes["Type1_6_by_Type4_3"].SkippedReason)
 	assert.NoError(t, plan.finishedNodes["Type1_6_by_Type4_3"].Err)
 
 	assert.False(t, plan.finishedNodes["Type4_3"].Success)
 	assert.True(t, plan.finishedNodes["Type4_3"].Skipped)
+	assert.Equal(t, "节点[Type4_3]存在执行失败的依赖节点[Type1_1]", plan.finishedNodes["Type4_3"].SkippedReason)
 	assert.NoError(t, plan.finishedNodes["Type4_3"].Err)
 
 	assert.True(t, plan.finishedNodes["PlanExtractor"].Success)

@@ -73,7 +73,7 @@ type Plan struct {
 	stop                   atomic.Bool               // If the process should stop
 	chainNodes             []string                  // The nodes specified by Run method in engine.
 	failedNodes            map[string]struct{}       // The node reference to all the failed running node. Key is BoxName
-	finishedOriginalNodes  map[string]struct{}       // The FinishedNodes uses BoxName as its key. But different BoxName might has the same node, so it's convenient to maintain this field for filtering
+	finishedOriginalNodes  map[string]struct{}       // The finishedNodes uses BoxName as its key. But different BoxName might has the same node, so it's convenient to maintain this field for filtering
 	conditionalTargetNodes map[string]struct{}       // The TargetNodes can be modified at runtime. But if conditional node is about to execute, the original node shoud be added to targets at runtime without risk. Key is OriginalName
 	startTime              time.Time                 // The start time for this plan
 	finishedNodes          map[string]*ExecuteResult // The finished nodes in this execution, it will contain all the nodes executed this time. Key is BoxName.
