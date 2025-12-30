@@ -3,7 +3,6 @@ package kflow
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -988,6 +987,57 @@ func TestIndirectError(t *testing.T) {
 
 }
 
+func TestIndirectError2(t *testing.T) {
+	node := new(Node[*State])
+
+	var plan *Plan
+
+	eng := NewEngine[*State]("")
+	assert.NoError(t, AddNode(eng, NewNodeErrorType("TypeError_1", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_1", []string{
+		"TypeError_1", "Type1_2",
+	})))
+	assert.NoError(t, AddNode(eng, NewNodeErrorType("TypeError_2", []string{"Type1_2"})))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_2", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_3", nil)))
+	assert.NoError(t, AddNode(eng, NewNodeType4("Type4_1", []*Dependency[*State]{
+		node.ConditionalDependency("Type1_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_3", "TypeError_2"}),
+	})))
+	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
+	assert.NoError(t, eng.Prepare())
+
+	// fmt.Println(eng.Dot())
+
+	state := new(State)
+	assert.NoError(t, eng.Run(context.Background(), state, "Type4_1", "PlanExtractor"))
+	result, err := plan.GetExecuteResult()
+	assert.Nil(t, err)
+	assert.Equal(t, 6, len(result))
+	assert.ElementsMatch(t, []string{"Type1_3", "Type1_2"}, state.Stamps[0:2])
+	assert.True(t, plan.finishedNodes["Type1_3"].Success())
+	assert.True(t, plan.finishedNodes["Type1_3"].RunInParallel())
+	assert.True(t, plan.finishedNodes["Type1_2"].Success())
+	assert.True(t, plan.finishedNodes["Type1_2"].RunInParallel())
+
+	assert.False(t, plan.finishedNodes["TypeError_2"].Success())
+	assert.False(t, plan.finishedNodes["TypeError_2"].Skipped())
+	assert.Error(t, plan.finishedNodes["TypeError_2"].Err)
+
+	assert.False(t, plan.finishedNodes["Type1_1_by_Type4_1"].Success())
+	assert.True(t, plan.finishedNodes["Type1_1_by_Type4_1"].Skipped())
+	assert.True(t, plan.finishedNodes["Type1_1_by_Type4_1"].Conditional())
+	assert.NoError(t, plan.finishedNodes["Type1_1_by_Type4_1"].Err)
+	assert.Equal(t, "节点[Type1_1_by_Type4_1]存在执行失败的依赖节点[TypeError_2]", plan.finishedNodes["Type1_1_by_Type4_1"].SkippedReason)
+
+	assert.False(t, plan.finishedNodes["Type4_1"].Success())
+	assert.True(t, plan.finishedNodes["Type4_1"].Skipped())
+	assert.Equal(t, "节点[Type4_1]存在执行失败的依赖节点[TypeError_2]", plan.finishedNodes["Type4_1"].SkippedReason)
+	assert.NoError(t, plan.finishedNodes["Type4_1"].Err)
+
+	assert.True(t, plan.finishedNodes["PlanExtractor"].Success())
+
+}
+
 func TestAddNodesDynamically(t *testing.T) {
 	node := new(Node[*State])
 
@@ -1013,7 +1063,7 @@ func TestAddNodesDynamically(t *testing.T) {
 
 	assert.NoError(t, eng.Prepare())
 	assert.NoError(t, eng.Prepare())
-	fmt.Println(eng.Dot())
+	// fmt.Println(eng.Dot())
 	assert.NoError(t, eng.Run(context.Background(), state, "TypeAddNode_1", "PlanExtractor"))
 	results, err := plan.GetExecuteResult()
 	assert.NoError(t, err)
@@ -1155,14 +1205,23 @@ func TestExecuteInRunTimeCheckParallel(t *testing.T) {
 	assert.Equal(t, 9, len(plan.finishedNodes))
 	assert.Equal(t, []string{"Type1_1", "PlanExtractor"}, plan.GetChainNodes())
 	assert.True(t, plan.finishedNodes["Type1_1"].Success())
+	assert.False(t, plan.finishedNodes["Type1_1"].RunInParallel())
 	assert.True(t, plan.finishedNodes["Type1_2"].Success())
+	assert.False(t, plan.finishedNodes["Type1_2"].RunInParallel())
 	assert.True(t, plan.finishedNodes["Type1_3"].Success())
+	assert.False(t, plan.finishedNodes["Type1_3"].RunInParallel())
 	assert.True(t, plan.finishedNodes["Type1_4"].Success())
+	assert.False(t, plan.finishedNodes["Type1_4"].RunInParallel())
 	assert.True(t, plan.finishedNodes["Type1_5"].Success())
+	assert.True(t, plan.finishedNodes["Type1_5"].RunInParallel())
 	assert.True(t, plan.finishedNodes["Type1_6"].Success())
+	assert.True(t, plan.finishedNodes["Type1_6"].RunInParallel())
 	assert.True(t, plan.finishedNodes["Operator1_1"].Success())
+	assert.False(t, plan.finishedNodes["Operator1_1"].RunInParallel())
 	assert.True(t, plan.finishedNodes["Type1_7"].Success())
+	assert.True(t, plan.finishedNodes["Type1_7"].RunInParallel())
 	assert.True(t, plan.finishedNodes["PlanExtractor"].Success())
+	assert.False(t, plan.finishedNodes["PlanExtractor"].RunInParallel())
 
 }
 
