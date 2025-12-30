@@ -1093,7 +1093,6 @@ func TestIndirectError3(t *testing.T) {
 	assert.NoError(t, AddNode(eng, NewNodeType1("Type1_3", nil)))
 	assert.NoError(t, AddNode(eng, NewNodeType4("Type4_1", []*Dependency[*State]{
 		node.ConditionalDependency("Type1_1", func(ctx context.Context, s *State) bool { return true }, []string{"Type1_3", "TypeError_2"}),
-		node.StaticDependency("TypeError_1"),
 	})))
 	assert.NoError(t, AddNode(eng, NewNodePlanExtractor("PlanExtractor", nil, &plan)))
 	assert.NoError(t, eng.Prepare())
@@ -1129,7 +1128,7 @@ func TestIndirectError3(t *testing.T) {
 
 	assert.False(t, plan.finishedNodes["Type4_1"].Success())
 	assert.True(t, plan.finishedNodes["Type4_1"].Skipped())
-	assert.Contains(t, []string{"节点[Type4_1]存在执行失败的依赖节点[TypeError_2]", "节点[Type4_1]存在执行失败的依赖节点[TypeError_1]"}, plan.finishedNodes["Type4_1"].SkippedReason)
+	assert.Equal(t, "节点[Type4_1]存在执行失败的依赖节点[TypeError_2]", plan.finishedNodes["Type4_1"].SkippedReason)
 	assert.NoError(t, plan.finishedNodes["Type4_1"].Err)
 
 	assert.True(t, plan.finishedNodes["PlanExtractor"].Success())
