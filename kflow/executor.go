@@ -168,7 +168,7 @@ func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *nodeBox[T], stat
 		ExecuteBy:    plan.currentNode,
 	}
 	if plan.inParallel.Load() {
-		result.SetRunInParallel()
+		result.setRunInParallel()
 	}
 	// conditional node will not run in runOneNode. So no need to set Conditional state here.
 
@@ -191,13 +191,13 @@ func (n *nodeExecutor[T]) runOneNode(ctx context.Context, node *nodeBox[T], stat
 	if err != nil {
 		result.Err = err
 		if isPanic {
-			result.SetPanic()
+			result.setPanic()
 		}
 		result.EndTime = time.Now()
 		return result
 	}
 
-	result.SetSuccess()
+	result.setSuccess()
 	result.EndTime = time.Now()
 	return result
 }
@@ -218,10 +218,10 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 				ExecuteBy:     plan.currentNode,
 			}
 			if plan.inParallel.Load() {
-				result.SetRunInParallel()
+				result.setRunInParallel()
 			}
-			result.SetSkipped()
-			result.SetConditional()
+			result.setSkipped()
+			result.setConditional()
 			return false, result, nil
 		}
 
@@ -235,13 +235,13 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 			ExecuteBy:     plan.currentNode,
 		}
 		if plan.inParallel.Load() {
-			result.SetRunInParallel()
+			result.setRunInParallel()
 		}
 		if node.Condition != nil {
-			result.SetConditional()
+			result.setConditional()
 		}
-		result.SetSuccess()
-		result.SetSkipped()
+		result.setSuccess()
+		result.setSkipped()
 
 		return false, result, nil
 	}
@@ -267,12 +267,12 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 			EndTime:       time.Now(),
 		}
 		if plan.inParallel.Load() {
-			result.SetRunInParallel()
+			result.setRunInParallel()
 		}
 		if node.Condition != nil {
-			result.SetConditional()
+			result.setConditional()
 		}
-		result.SetSkipped()
+		result.setSkipped()
 
 		return false, result, nil
 	}
@@ -298,12 +298,12 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 				EndTime:      time.Now(),
 				Err:          err,
 			}
-			result.SetConditional()
+			result.setConditional()
 			if isPanic {
-				result.SetPanic()
+				result.setPanic()
 			}
 			if plan.inParallel.Load() {
-				result.SetRunInParallel()
+				result.setRunInParallel()
 			}
 
 			return false, result, nil
@@ -318,11 +318,11 @@ func (n *nodeExecutor[T]) canRun(ctx context.Context, nodes *container.Dag[strin
 				SkippedReason: fmt.Sprintf(message(plan.config.Language, conditionEvaludateToFalse), node.BoxName),
 				EndTime:       time.Now(),
 			}
-			result.SetConditional()
-			result.SetSkipped()
-			result.SetSuccess()
+			result.setConditional()
+			result.setSkipped()
+			result.setSuccess()
 			if plan.inParallel.Load() {
-				result.SetRunInParallel()
+				result.setRunInParallel()
 			}
 
 			return false, result, nil

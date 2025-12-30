@@ -77,7 +77,7 @@ func (e *ExecuteResult) Success() bool {
 	return e.getState(0)
 }
 
-func (e *ExecuteResult) SetSuccess() {
+func (e *ExecuteResult) setSuccess() {
 	e.setState(0)
 }
 
@@ -86,7 +86,7 @@ func (e *ExecuteResult) Panic() bool {
 	return e.getState(1)
 }
 
-func (e *ExecuteResult) SetPanic() {
+func (e *ExecuteResult) setPanic() {
 	e.setState(1)
 }
 
@@ -95,7 +95,7 @@ func (e *ExecuteResult) RunInParallel() bool {
 	return e.getState(2)
 }
 
-func (e *ExecuteResult) SetRunInParallel() {
+func (e *ExecuteResult) setRunInParallel() {
 	e.setState(2)
 }
 
@@ -104,7 +104,7 @@ func (e *ExecuteResult) Skipped() bool {
 	return e.getState(3)
 }
 
-func (e *ExecuteResult) SetSkipped() {
+func (e *ExecuteResult) setSkipped() {
 	e.setState(3)
 }
 
@@ -113,7 +113,7 @@ func (e *ExecuteResult) Conditional() bool {
 	return e.getState(4)
 }
 
-func (e *ExecuteResult) SetConditional() {
+func (e *ExecuteResult) setConditional() {
 	e.setState(4)
 }
 
